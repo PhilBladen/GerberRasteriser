@@ -1,11 +1,15 @@
 package main;
 
+import java.util.ArrayList;
+
+import main.GeometricPrimitives.GeometricPrimitive;
+
 public class Aperture
 {
+	protected ArrayList<GeometricPrimitive> geometricPrimitives = new ArrayList<>();
+	
 	public static class Circle extends Aperture
 	{
-		public int diameter, holeDiameter;
-		
 		public Circle(int diameter)
 		{
 			this(diameter, 0);
@@ -13,8 +17,8 @@ public class Aperture
 		
 		public Circle(int diameter, int holeDiameter)
 		{
-			this.diameter = diameter;
-			this.holeDiameter = holeDiameter;
+			geometricPrimitives.add(new GeometricPrimitives.Circle(true, diameter, GeometricPrimitives.origin, 0));
+			geometricPrimitives.add(new GeometricPrimitives.Circle(false, holeDiameter, GeometricPrimitives.origin, 0));
 		}
 	}
 	
@@ -78,6 +82,6 @@ public class Aperture
 	
 	public static class Custom extends Aperture
 	{
-		
+		// FIXME
 	}
 }
