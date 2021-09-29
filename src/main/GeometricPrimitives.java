@@ -3,6 +3,8 @@ package main;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.geom.AffineTransform;
+import java.awt.geom.Ellipse2D;
+import java.awt.geom.Rectangle2D;
 
 public class GeometricPrimitives
 {
@@ -45,7 +47,10 @@ public class GeometricPrimitives
 			g.translate(Utils.toPixels(offset.x), Utils.toPixels(offset.y));
 			
 			g.setColor(exposure ? Color.WHITE : Color.BLACK);
-			g.fillOval(Utils.toPixels(center.x - diameter * 0.5), Utils.toPixels(center.y - diameter * 0.5), Utils.toPixels(diameter), Utils.toPixels(diameter));
+			
+			g.fill(new Ellipse2D.Double(Utils.toPixels(center.x - diameter * 0.5), Utils.toPixels(center.y - diameter * 0.5), Utils.toPixels(diameter), Utils.toPixels(diameter)));
+			
+//			g.fillOval(Utils.toPixels(center.x - diameter * 0.5), Utils.toPixels(center.y - diameter * 0.5), Utils.toPixels(diameter), Utils.toPixels(diameter));
 			
 //			System.out.println(String.format("X: %d, Y: %d", center.x + offset.x, center.y + offset.y));
 			
@@ -74,9 +79,32 @@ public class GeometricPrimitives
 		public Coordinate center;
 		public double rotation;
 		
+		public Rectangle(boolean exposure, int width, int height, Coordinate center, double rotation)
+		{
+			this.exposure = exposure;
+			this.width = width;
+			this.height = height;
+			this.center = center;
+			this.rotation = rotation;
+		}
+		
+		@Override
+		public GeometricPrimitive clone()
+		{
+			return new Rectangle(exposure, width, height, center, rotation);
+		}
+		
 		@Override
 		public void render(Graphics2D g)
 		{
+			AffineTransform a = g.getTransform();
+			g.translate(Utils.toPixels(offset.x), Utils.toPixels(offset.y));
+			
+			g.setColor(exposure ? Color.WHITE : Color.BLACK);
+			g.fill(new Rectangle2D.Double(Utils.toPixels(center.x - width * 0.5), Utils.toPixels(center.y - height * 0.5), Utils.toPixels(width), Utils.toPixels(height)));
+//			g.fillRect(Utils.toPixels(center.x - width * 0.5), Utils.toPixels(center.y - height * 0.5), Utils.toPixels(width), Utils.toPixels(height));
+			
+			g.setTransform(a);
 		}
 	}
 	

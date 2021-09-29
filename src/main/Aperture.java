@@ -2,6 +2,7 @@ package main;
 
 import java.util.ArrayList;
 
+import main.GeometricPrimitives.Coordinate;
 import main.GeometricPrimitives.GeometricPrimitive;
 
 public class Aperture
@@ -23,9 +24,7 @@ public class Aperture
 	}
 	
 	public static class Rectangle extends Aperture
-	{
-		public int x, y, holeDiameter;
-		
+	{		
 		public Rectangle(int x, int y)
 		{
 			this(x, y, 0);
@@ -33,16 +32,13 @@ public class Aperture
 		
 		public Rectangle(int x, int y, int holeDiameter)
 		{
-			this.x = x;
-			this.y = y;
-			this.holeDiameter = holeDiameter;
+			geometricPrimitives.add(new GeometricPrimitives.Rectangle(true, x, y, GeometricPrimitives.origin, 0));
+			geometricPrimitives.add(new GeometricPrimitives.Circle(false, holeDiameter, GeometricPrimitives.origin, 0));
 		}
 	}
 	
 	public static class ObRound extends Aperture
-	{
-		public int x, y, holeDiameter;
-		
+	{		
 		public ObRound(int x, int y)
 		{
 			this(x, y, 0);
@@ -50,9 +46,27 @@ public class Aperture
 		
 		public ObRound(int x, int y, int holeDiameter)
 		{
-			this.x = x;
-			this.y = y;
-			this.holeDiameter = holeDiameter;
+			if (x == y)
+			{
+				geometricPrimitives.add(new GeometricPrimitives.Circle(true, x, GeometricPrimitives.origin, 0));
+			}
+			else if (x > y)
+			{
+				int d = x - y;
+				
+				geometricPrimitives.add(new GeometricPrimitives.Circle(true, y, new Coordinate(-d / 2, 0), 0));
+				geometricPrimitives.add(new GeometricPrimitives.Circle(true, y, new Coordinate(d / 2, 0), 0));
+				geometricPrimitives.add(new GeometricPrimitives.Rectangle(true, d, y, GeometricPrimitives.origin, 0));
+			}
+			else
+			{
+				int d = y - x;
+				
+				geometricPrimitives.add(new GeometricPrimitives.Circle(true, x, new Coordinate(0, -d / 2), 0));
+				geometricPrimitives.add(new GeometricPrimitives.Circle(true, x, new Coordinate(0, d / 2), 0));
+				geometricPrimitives.add(new GeometricPrimitives.Rectangle(true, x, d, GeometricPrimitives.origin, 0));
+			}
+			geometricPrimitives.add(new GeometricPrimitives.Circle(false, holeDiameter, GeometricPrimitives.origin, 0));
 		}
 	}
 	

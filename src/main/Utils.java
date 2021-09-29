@@ -34,9 +34,9 @@ public class Utils
 		return (int) (in * config.multiplier);
 	}
 	
-	public static int toPixels(double d)
+	public static double toPixels(double d)
 	{
-		return (int) (Config.getConfig().nanosToPixels * d);
+		return Config.getConfig().nanosToPixels * d;
 	}
 	
 	public static int countMatchingGroups(Matcher m)
