@@ -26,6 +26,7 @@ import static main.Utils.*;
 public class Renderer
 {
 	private JFrame frame;
+	private GerberCanvas c;
 
 	double scale = 1.0;
 
@@ -96,13 +97,14 @@ public class Renderer
 		{
 		}
 		
-		GerberCanvas c = new GerberCanvas();
+		c = new GerberCanvas();
 
 		frame = new JFrame("Gerber Rasteriser");
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frame.setLayout(new BorderLayout());
 		frame.add(c);
 		frame.pack();
+		frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
 		frame.setLocationRelativeTo(null);
 		frame.setVisible(true);
 
@@ -214,9 +216,27 @@ public class Renderer
 	}
 
 	public ArrayList<GeometricPrimitive> primitives = new ArrayList<>();
+	double maxX = 0, maxY = 0;
 
 	public void redraw()
 	{
+		maxX = 0;
+		maxY = 0;
+		for (GeometricPrimitive p : primitives)
+		{
+			if (p.offset.x > maxX)
+				maxX = p.offset.x;
+			if (p.offset.y > maxY)
+				maxY = p.offset.y;
+		}
+		maxX = Utils.toPixels(maxX);
+		maxY = Utils.toPixels(maxY);
+		
+		scale = 1.0;
+		currentOffset.set((c.getWidth() - maxX) * 0.5, (maxY - c.getHeight()) * 0.5);
+		
+		updateRenderOffset();
+		
 		frame.repaint();
 	}
 
