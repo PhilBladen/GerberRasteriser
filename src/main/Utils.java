@@ -53,4 +53,14 @@ public class Utils
 		}
 		return numGroups;
 	}
+	
+	public static void log(Object o)
+	{
+		System.out.println(o.toString());
+	}
+
+	public static void err(Object o)
+	{
+		System.err.println(o.toString());
+	}
 }

@@ -11,6 +11,7 @@ import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
+import java.awt.geom.AffineTransform;
 import java.util.ArrayList;
 
 import javax.swing.JFrame;
@@ -18,8 +19,9 @@ import javax.swing.JPanel;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 
-import main.GeometricPrimitives.Coordinate;
 import main.GeometricPrimitives.GeometricPrimitive;
+
+import static main.Utils.*;
 
 public class Renderer
 {
@@ -28,10 +30,61 @@ public class Renderer
 	double scale = 1.0;
 
 	boolean dragging = false;
-	Coordinate dragStart = new Coordinate(0, 0);
-	Coordinate currentOffset = new Coordinate(0, 0);
-
-	Coordinate renderOffset = new Coordinate(0, 0);
+	PositionD dragStart = new PositionD(0, 0);
+	PositionD currentOffset = new PositionD(0, 0);
+	PositionD dragOffset = new PositionD(0, 0);
+	PositionD renderOffset = new PositionD(0, 0);
+	
+	public class PositionD
+	{
+		double x, y;
+		
+		public PositionD(double x, double y)
+		{
+			this.x = x;
+			this.y = y;
+		}
+		
+		public PositionD add(PositionD p)
+		{
+			return new PositionD(x + p.x, y + p.y);
+		}
+		
+		public PositionD subtract(PositionD p)
+		{
+			return new PositionD(x - p.x, y - p.y);
+		}
+		
+		public PositionD multiply(double s)
+		{
+			return new PositionD(x * s, y * s);
+		}
+		
+		public void set(PositionD p)
+		{
+			this.x = p.x;
+			this.y = p.y;
+		}
+		
+		public void set(double x, double y)
+		{
+			this.x = x;
+			this.y = y;
+		}
+		
+		@Override
+		public String toString()
+		{
+			return String.format("[%f, %f]", x, y);
+		}
+	}
+	
+	private void updateRenderOffset()
+	{
+		renderOffset.set(currentOffset.add(dragOffset));
+		
+		frame.repaint();
+	}
 
 	public void createWindow()
 	{
@@ -42,42 +95,64 @@ public class Renderer
 		catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException ex)
 		{
 		}
+		
+		GerberCanvas c = new GerberCanvas();
 
 		frame = new JFrame("Gerber Rasteriser");
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frame.setLayout(new BorderLayout());
-		frame.add(new Canvas());
+		frame.add(c);
 		frame.pack();
 		frame.setLocationRelativeTo(null);
 		frame.setVisible(true);
 
-		frame.addMouseWheelListener(new MouseWheelListener()
+		c.addMouseWheelListener(new MouseWheelListener()
 		{
 			@Override
 			public void mouseWheelMoved(MouseWheelEvent e)
 			{
+				log("");
+				
+				PositionD mousePos = new PositionD(e.getX(), e.getY());
+				log("Mouse raw: " + mousePos);
+				
+				PositionD canvasMousePos = mousePos.subtract(currentOffset);
+				log("Mouse on canvas: " + canvasMousePos);
+				
+				log("Initial offset: " + currentOffset);
+								
+				double scaleMultiplier;
+				final double scalePerClick = 2;
 				if (e.getPreciseWheelRotation() < 0)
-					scale *= 1.1;
+					scaleMultiplier = scalePerClick;
 				else
-					scale /= 1.1;
-
-				frame.repaint();
-
-				System.out.println(scale);
+					scaleMultiplier = 1 / scalePerClick;
+				
+				scale *= scaleMultiplier;
+				
+				PositionD newCanvasMousePos = canvasMousePos.multiply(scaleMultiplier);
+				log("New mouse on canvas: " + newCanvasMousePos);
+				
+				currentOffset.set(mousePos.subtract(newCanvasMousePos));				
+				log("New offset: " + currentOffset);
+				
+				updateRenderOffset();
 			}
 		});
 
-		frame.addMouseListener(new MouseListener()
+		c.addMouseListener(new MouseListener()
 		{
-
 			@Override
 			public void mouseReleased(MouseEvent e)
 			{
 				dragging = false;
-				currentOffset.x = renderOffset.x;
-				currentOffset.y = renderOffset.y;
-				renderOffset.x = 0;
-				renderOffset.y = 0;
+				
+				currentOffset.set(currentOffset.add(dragOffset));
+				dragOffset.set(0, 0);
+				
+				log("Stop drag");
+				
+				updateRenderOffset();
 
 			}
 
@@ -88,7 +163,7 @@ public class Renderer
 				dragStart.x = e.getX();
 				dragStart.y = e.getY();
 
-				System.out.println("Dragging");
+				log("Dragging");
 			}
 
 			@Override
@@ -113,7 +188,7 @@ public class Renderer
 			}
 		});
 
-		frame.addMouseMotionListener(new MouseMotionListener()
+		c.addMouseMotionListener(new MouseMotionListener()
 		{
 
 			@Override
@@ -127,12 +202,12 @@ public class Renderer
 			{
 				if (dragging)
 				{
-					renderOffset.x = e.getX() - dragStart.x + currentOffset.x;
-					renderOffset.y = e.getY() - dragStart.y + currentOffset.y;
+					PositionD mousePos = new PositionD(e.getX(), e.getY());
+					dragOffset.set(mousePos.subtract(dragStart));
 
-					System.out.println(renderOffset.x + ", " + renderOffset.y);
+					log("Offset: " + renderOffset);
 
-					frame.repaint();
+					updateRenderOffset();
 				}
 			}
 		});
@@ -145,11 +220,11 @@ public class Renderer
 		frame.repaint();
 	}
 
-	public class Canvas extends JPanel
+	public class GerberCanvas extends JPanel
 	{
 		private static final long serialVersionUID = 1L;
 
-		public Canvas()
+		public GerberCanvas()
 		{
 			super(true);
 		}
@@ -166,10 +241,12 @@ public class Renderer
 			super.paintComponent(g);
 
 			Graphics2D graphics2D = (Graphics2D) g;
+			
+			AffineTransform a = graphics2D.getTransform();
 
 			 graphics2D.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON); // Set anti-alias!
 			// graphics2D.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON); // Set anti-alias for text
-
+			 
 			// Draw background:
 			g.setColor(Color.BLACK);
 			g.fillRect(0, 0, getWidth(), getHeight());
@@ -182,6 +259,10 @@ public class Renderer
 			{
 				primitive.render(graphics2D);
 			}
+			
+//			graphics2D.setTransform(a);
+//			g.setColor(Color.red);
+//			graphics2D.drawOval(100, 100, 1, 1);
 		}
 	}
 }

@@ -12,6 +12,8 @@ import main.Config.UnitType;
 import main.GeometricPrimitives.Coordinate;
 import main.GeometricPrimitives.GeometricPrimitive;
 
+import static main.Utils.*;
+
 public class Main
 {
 	private final String APP_NAME = "Gerber Rasteriser";
@@ -90,16 +92,6 @@ public class Main
 	public static void main(String[] args)
 	{
 		new Main();
-	}
-
-	private void log(String s)
-	{
-		System.out.println(s);
-	}
-
-	private void err(String s)
-	{
-		System.err.println(s);
 	}
 
 	private void setUnitsMM()
