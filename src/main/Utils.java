@@ -41,7 +41,7 @@ public class Utils
 	
 	public static int countMatchingGroups(Matcher m)
 	{
-		int numGroups = 0;
+		int numGroups = m.groupCount();
 		for (int i = 0; i < m.groupCount(); i++)
 		{
 			String group = m.group(i);

@@ -1,5 +1,6 @@
 package main;
 
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
@@ -21,6 +22,12 @@ public class Main
 
 	private HashMap<String, Aperture> apertureDictionary = new HashMap<>();
 	private HashMap<String, Aperture> apertureTemplateDictionary = new HashMap<>();
+	
+	private final Pattern formatSpecificationPattern = Pattern.compile("^FS(LA)X([0-9])([0-9])Y([0-9])([0-9])$");
+	private final Pattern apertureDefinitionPattern = Pattern.compile("^ADD(\\d\\d+)([A-Z0-9]+)[,]?([+-]?(?:[0-9]*[.])?[0-9]+)?(?:X([+-]?(?:[0-9]*[.])?[0-9]+))?(?:X([+-]?(?:[0-9]*[.])?[0-9]+))?(?:X([+-]?(?:[0-9]*[.])?[0-9]+))?$");
+	private final Pattern apertureMacroPattern = Pattern.compile("^AM([A-Z0-9]+)$");;
+	private final Pattern coordinatePattern = Pattern.compile("^(?:X([+-]?\\d+))?(?:Y([+-]?\\d+))?(?:I([+-]?\\d+))?(?:J([+-]?\\d+))?(D0\\d)$");
+	private final Pattern operationPattern = Pattern.compile("^D(\\d+)$");
 	
 	private Coordinate currentPoint = new Coordinate(0, 0);
 	private Aperture selectedAperture = null;
@@ -128,6 +135,11 @@ public class Main
 		}
 		
 	}
+	
+	private boolean isCoordinate(String word)
+	{
+		return coordinatePattern.matcher(word).matches();
+	}
 
 	private void processCommand(Command command)
 	{
@@ -151,8 +163,7 @@ public class Main
 		}
 		else if (commandWord.startsWith("FS")) // Format specification
 		{
-			Pattern p = Pattern.compile("^FS(LA)X([0-9])([0-9])Y([0-9])([0-9])$");
-			Matcher m = p.matcher(commandWord);
+			Matcher m = formatSpecificationPattern.matcher(commandWord);
 			if (!m.matches())
 				throw new RuntimeException("Illegal format specification: " + commandWord);
 			
@@ -173,8 +184,7 @@ public class Main
 		}
 		else if (commandWord.startsWith("AD")) // Aperture define
 		{
-			Pattern p = Pattern.compile("^ADD(\\d\\d+)([A-Z0-9]+)[,]?([+-]?(?:[0-9]*[.])?[0-9]+)?(?:X([+-]?(?:[0-9]*[.])?[0-9]+))?(?:X([+-]?(?:[0-9]*[.])?[0-9]+))?(?:X([+-]?(?:[0-9]*[.])?[0-9]+))?$");
-			Matcher m = p.matcher(commandWord);
+			Matcher m = apertureDefinitionPattern.matcher(commandWord);
 			if (!m.matches())
 				throw new RuntimeException("Illegal aperture definition: " + commandWord);
 			
@@ -252,8 +262,7 @@ public class Main
 			
 			ExtendedCommand extCmd = (ExtendedCommand) command;
 			
-			Pattern p = Pattern.compile("^AM([A-Z0-9]+)$");
-			Matcher m = p.matcher(commandWord);
+			Matcher m = apertureMacroPattern.matcher(commandWord);
 			if (!m.matches())
 				throw new RuntimeException("Illegal aperture macro: " + commandWord);
 			
@@ -261,10 +270,9 @@ public class Main
 			
 			addApertureTemplate(extCmd, apertureTemplateID);
 		}
-		else if (commandWord.startsWith("D"))
+		else if (commandWord.startsWith("D")) // Operation
 		{
-			Pattern p = Pattern.compile("^D(\\d+)$");
-			Matcher m = p.matcher(commandWord);
+			Matcher m = operationPattern.matcher(commandWord);
 			if (!m.matches())
 				throw new Exceptions.GerberCommandException("Invalid syntax: " + commandWord);
 			
@@ -280,15 +288,15 @@ public class Main
 				{
 					case 1: // Interpolate
 						// TODO
-						log("INTERPOLATE.");
+//						log("INTERPOLATE.");
 						break;
 					case 2: // Move
-						log("MOVE.");
+//						log("MOVE.");
 						// Ignored
 						break;
 					case 3: // Flash
 						flash(currentPoint);
-						log("FLASH.");
+//						log("FLASH.");
 						break;
 					default:
 						throw new RuntimeException("Invalid draw operation: " + commandWord);
@@ -361,10 +369,9 @@ public class Main
 		{
 
 		}
-		else if (commandWord.startsWith("X") || commandWord.startsWith("Y") || commandWord.startsWith("I") || commandWord.startsWith("J")) // Coordinate
+		else if (isCoordinate(commandWord)) // Coordinate
 		{
-			Pattern p = Pattern.compile("^(?:X([+-]?\\d+))?(?:Y([+-]?\\d+))?(?:I([+-]?\\d+))?(?:J([+-]?\\d+))?(D0\\d)$");
-			Matcher m = p.matcher(commandWord);
+			Matcher m = coordinatePattern.matcher(commandWord);
 			if (!m.matches())
 				throw new RuntimeException("Invalid draw command: " + commandWord);
 			
@@ -498,7 +505,7 @@ public class Main
 	{
 		log("Running " + APP_NAME + " " + APP_VERSION);
 
-		File testGerberFile = new File("./Reference files/STAR-XL CCT.GTL");
+		File testGerberFile = new File("E:/PJB/Programming/Java/Workspace/GerberRasteriser/Reference files/GerberTest/GerberFiles/copper_top.gbr");
 		if (!testGerberFile.exists())
 			throw new RuntimeException("Failed to open gerber file. Are you sure it exists?");
 		log("Found gerber file.");
@@ -508,7 +515,7 @@ public class Main
 
 		Timer.tic();
 		ArrayList<Command> commands = new ArrayList<>();
-		try (InputStream in = new FileInputStream(testGerberFile))
+		try (InputStream in = new BufferedInputStream(new FileInputStream(testGerberFile)))
 		{
 			int c;
 			ParserState parserState = ParserState.NONE;
