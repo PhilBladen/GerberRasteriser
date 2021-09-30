@@ -1,13 +1,48 @@
 package main;
 
-import java.util.ArrayList;
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.geom.AffineTransform;
+import java.awt.geom.Area;
 
 import main.GeometricPrimitives.Coordinate;
-import main.GeometricPrimitives.GeometricPrimitive;
 
 public class Aperture
 {
-	protected ArrayList<GeometricPrimitive> geometricPrimitives = new ArrayList<>();
+	private AffineTransform transform = null;
+	protected Area area = new Area();
+	
+	public Coordinate offset = new Coordinate(0, 0);
+	
+	public Aperture clone()
+	{
+		Aperture a = new Aperture();
+		a.area = (Area) area.clone();
+		return a;
+	}
+	
+	private void pushTransform(Graphics2D g)
+	{
+		transform = g.getTransform();
+	}
+	
+	private void popTransform(Graphics2D g)
+	{
+		if (transform == null)
+			throw new RuntimeException("Pop requested but transform not pushed.");
+		g.setTransform(transform);
+	}
+	
+	public void render(Graphics2D g)
+	{
+		pushTransform(g);
+		g.translate(Utils.toPixels(offset.x), Utils.toPixels(offset.y));
+		
+		g.setColor(Color.WHITE);
+		g.fill(area);
+		
+		popTransform(g);
+	}
 	
 	public static class Circle extends Aperture
 	{
@@ -18,8 +53,8 @@ public class Aperture
 		
 		public Circle(int diameter, int holeDiameter)
 		{
-			geometricPrimitives.add(new GeometricPrimitives.Circle(true, diameter, GeometricPrimitives.origin, 0));
-			geometricPrimitives.add(new GeometricPrimitives.Circle(false, holeDiameter, GeometricPrimitives.origin, 0));
+			area.add(new GeometricPrimitives.Circle(diameter, GeometricPrimitives.origin, 0));
+			area.subtract(new GeometricPrimitives.Circle(holeDiameter, GeometricPrimitives.origin, 0));
 		}
 	}
 	
@@ -32,8 +67,8 @@ public class Aperture
 		
 		public Rectangle(int x, int y, int holeDiameter)
 		{
-			geometricPrimitives.add(new GeometricPrimitives.Rectangle(true, x, y, GeometricPrimitives.origin, 0));
-			geometricPrimitives.add(new GeometricPrimitives.Circle(false, holeDiameter, GeometricPrimitives.origin, 0));
+			area.add(new GeometricPrimitives.Rectangle(x, y, GeometricPrimitives.origin, 0));
+			area.subtract(new GeometricPrimitives.Circle(holeDiameter, GeometricPrimitives.origin, 0));
 		}
 	}
 	
@@ -48,33 +83,30 @@ public class Aperture
 		{
 			if (x == y)
 			{
-				geometricPrimitives.add(new GeometricPrimitives.Circle(true, x, GeometricPrimitives.origin, 0));
+				area.add(new GeometricPrimitives.Circle(x, GeometricPrimitives.origin, 0));
 			}
 			else if (x > y)
 			{
 				int d = x - y;
 				
-				geometricPrimitives.add(new GeometricPrimitives.Circle(true, y, new Coordinate(-d / 2, 0), 0));
-				geometricPrimitives.add(new GeometricPrimitives.Circle(true, y, new Coordinate(d / 2, 0), 0));
-				geometricPrimitives.add(new GeometricPrimitives.Rectangle(true, d, y, GeometricPrimitives.origin, 0));
+				area.add(new GeometricPrimitives.Circle(y, new Coordinate(-d / 2, 0), 0));
+				area.add(new GeometricPrimitives.Circle(y, new Coordinate(d / 2, 0), 0));
+				area.add(new GeometricPrimitives.Rectangle(d, y, GeometricPrimitives.origin, 0));
 			}
 			else
 			{
 				int d = y - x;
 				
-				geometricPrimitives.add(new GeometricPrimitives.Circle(true, x, new Coordinate(0, -d / 2), 0));
-				geometricPrimitives.add(new GeometricPrimitives.Circle(true, x, new Coordinate(0, d / 2), 0));
-				geometricPrimitives.add(new GeometricPrimitives.Rectangle(true, x, d, GeometricPrimitives.origin, 0));
+				area.add(new GeometricPrimitives.Circle(x, new Coordinate(0, -d / 2), 0));
+				area.add(new GeometricPrimitives.Circle(x, new Coordinate(0, d / 2), 0));
+				area.add(new GeometricPrimitives.Rectangle(x, d, GeometricPrimitives.origin, 0));
 			}
-			geometricPrimitives.add(new GeometricPrimitives.Circle(false, holeDiameter, GeometricPrimitives.origin, 0));
+			area.subtract(new GeometricPrimitives.Circle(holeDiameter, GeometricPrimitives.origin, 0));
 		}
 	}
 	
 	public static class Polygon extends Aperture
-	{
-		public int outerDiameter, numVertices, holeDiameter;
-		public double rotation;
-		
+	{		
 		public Polygon(int outerDiameter, int numVertices)
 		{
 			this(outerDiameter, numVertices, 0);
@@ -87,10 +119,8 @@ public class Aperture
 		
 		public Polygon(int outerDiameter, int numVertices, double rotation, int holeDiameter)
 		{
-			this.outerDiameter = outerDiameter;
-			this.numVertices = numVertices;
-			this.rotation = rotation;
-			this.holeDiameter = holeDiameter;
+			area.add(new GeometricPrimitives.Polygon(numVertices, outerDiameter, GeometricPrimitives.origin, rotation));
+			area.subtract(new GeometricPrimitives.Circle(holeDiameter, GeometricPrimitives.origin, 0));
 		}
 	}
 	

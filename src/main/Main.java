@@ -1,5 +1,8 @@
 package main;
 
+import static main.Utils.err;
+import static main.Utils.log;
+
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -11,9 +14,6 @@ import java.util.regex.Pattern;
 
 import main.Config.UnitType;
 import main.GeometricPrimitives.Coordinate;
-import main.GeometricPrimitives.GeometricPrimitive;
-
-import static main.Utils.*;
 
 public class Main
 {
@@ -126,14 +126,10 @@ public class Main
 			return;
 //			throw new RuntimeException("Flash requested but no aperture selected.");
 		
-		for (GeometricPrimitive template : selectedAperture.geometricPrimitives)
-		{
-			GeometricPrimitive g = template.clone();
-			g.offset.x = currentPoint.x;
-			g.offset.y = currentPoint.y;
-			renderer.primitives.add(g);
-		}
-		
+		Aperture a = selectedAperture.clone();
+		a.offset.x = currentPoint.x;
+		a.offset.y = currentPoint.y;
+		renderer.apertures.add(a);
 	}
 	
 	private boolean isCoordinate(String word)
@@ -269,6 +265,8 @@ public class Main
 			String apertureTemplateID = m.group(1);
 			
 			addApertureTemplate(extCmd, apertureTemplateID);
+			
+			log("Aperture template " + apertureTemplateID + " added.");
 		}
 		else if (commandWord.startsWith("D")) // Operation
 		{

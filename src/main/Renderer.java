@@ -6,22 +6,17 @@ import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
-import java.awt.event.MouseMotionListener;
+import java.awt.event.MouseMotionAdapter;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
-import java.awt.geom.AffineTransform;
 import java.util.ArrayList;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
-
-import main.GeometricPrimitives.GeometricPrimitive;
-
-import static main.Utils.*;
 
 public class Renderer
 {
@@ -113,18 +108,18 @@ public class Renderer
 			@Override
 			public void mouseWheelMoved(MouseWheelEvent e)
 			{
-				log("");
+//				log("");
 				
 				PositionD mousePos = new PositionD(e.getX(), e.getY());
-				log("Mouse raw: " + mousePos);
+//				log("Mouse raw: " + mousePos);
 				
 				PositionD canvasMousePos = mousePos.subtract(currentOffset);
-				log("Mouse on canvas: " + canvasMousePos);
+//				log("Mouse on canvas: " + canvasMousePos);
 				
-				log("Initial offset: " + currentOffset);
+//				log("Initial offset: " + currentOffset);
 								
 				double scaleMultiplier;
-				final double scalePerClick = 2;
+				final double scalePerClick = 1.2;
 				if (e.getPreciseWheelRotation() < 0)
 					scaleMultiplier = scalePerClick;
 				else
@@ -133,16 +128,16 @@ public class Renderer
 				scale *= scaleMultiplier;
 				
 				PositionD newCanvasMousePos = canvasMousePos.multiply(scaleMultiplier);
-				log("New mouse on canvas: " + newCanvasMousePos);
+//				log("New mouse on canvas: " + newCanvasMousePos);
 				
 				currentOffset.set(mousePos.subtract(newCanvasMousePos));				
-				log("New offset: " + currentOffset);
+//				log("New offset: " + currentOffset);
 				
 				updateRenderOffset();
 			}
 		});
 
-		c.addMouseListener(new MouseListener()
+		c.addMouseListener(new MouseAdapter()
 		{
 			@Override
 			public void mouseReleased(MouseEvent e)
@@ -152,7 +147,7 @@ public class Renderer
 				currentOffset.set(currentOffset.add(dragOffset));
 				dragOffset.set(0, 0);
 				
-				log("Stop drag");
+//				log("Stop drag");
 				
 				updateRenderOffset();
 
@@ -165,40 +160,12 @@ public class Renderer
 				dragStart.x = e.getX();
 				dragStart.y = e.getY();
 
-				log("Dragging");
-			}
-
-			@Override
-			public void mouseExited(MouseEvent e)
-			{
-				// TODO Auto-generated method stub
-
-			}
-
-			@Override
-			public void mouseEntered(MouseEvent e)
-			{
-				// TODO Auto-generated method stub
-
-			}
-
-			@Override
-			public void mouseClicked(MouseEvent e)
-			{
-				// TODO Auto-generated method stub
-
+//				log("Dragging");
 			}
 		});
 
-		c.addMouseMotionListener(new MouseMotionListener()
+		c.addMouseMotionListener(new MouseMotionAdapter()
 		{
-
-			@Override
-			public void mouseMoved(MouseEvent e)
-			{
-
-			}
-
 			@Override
 			public void mouseDragged(MouseEvent e)
 			{
@@ -207,7 +174,7 @@ public class Renderer
 					PositionD mousePos = new PositionD(e.getX(), e.getY());
 					dragOffset.set(mousePos.subtract(dragStart));
 
-					log("Offset: " + renderOffset);
+//					log("Offset: " + renderOffset);
 
 					updateRenderOffset();
 				}
@@ -215,19 +182,19 @@ public class Renderer
 		});
 	}
 
-	public ArrayList<GeometricPrimitive> primitives = new ArrayList<>();
+	public ArrayList<Aperture> apertures = new ArrayList<>();
 	double maxX = 0, maxY = 0;
 
 	public void redraw()
 	{
 		maxX = 0;
 		maxY = 0;
-		for (GeometricPrimitive p : primitives)
+		for (Aperture a : apertures)
 		{
-			if (p.offset.x > maxX)
-				maxX = p.offset.x;
-			if (p.offset.y > maxY)
-				maxY = p.offset.y;
+			if (a.offset.x > maxX)
+				maxX = a.offset.x;
+			if (a.offset.y > maxY)
+				maxY = a.offset.y;
 		}
 		maxX = Utils.toPixels(maxX);
 		maxY = Utils.toPixels(maxY);
@@ -261,8 +228,6 @@ public class Renderer
 			super.paintComponent(g);
 
 			Graphics2D graphics2D = (Graphics2D) g;
-			
-			AffineTransform a = graphics2D.getTransform();
 
 			 graphics2D.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON); // Set anti-alias!
 			// graphics2D.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON); // Set anti-alias for text
@@ -275,14 +240,10 @@ public class Renderer
 			graphics2D.scale(scale, -scale);
 			graphics2D.translate(0, -getHeight());
 
-			for (GeometricPrimitive primitive : primitives)
+			for (Aperture a : apertures)
 			{
-				primitive.render(graphics2D);
+				a.render(graphics2D);
 			}
-			
-//			graphics2D.setTransform(a);
-//			g.setColor(Color.red);
-//			graphics2D.drawOval(100, 100, 1, 1);
 		}
 	}
 }

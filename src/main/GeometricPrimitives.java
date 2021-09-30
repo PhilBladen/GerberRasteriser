@@ -1,148 +1,112 @@
 package main;
 
-import java.awt.Color;
-import java.awt.Graphics2D;
 import java.awt.geom.AffineTransform;
+import java.awt.geom.Area;
 import java.awt.geom.Ellipse2D;
+import java.awt.geom.Line2D;
+import java.awt.geom.Path2D;
 import java.awt.geom.Rectangle2D;
 
 public class GeometricPrimitives
-{
-	public static abstract class GeometricPrimitive
+{	
+	public static class Circle extends Area
 	{
-		public Coordinate offset = new Coordinate(0, 0);
-		
-		public abstract void render(Graphics2D g);
-		public GeometricPrimitive clone()
+		public Circle(int diameter, Coordinate center, double rotation)
 		{
-			return null;
+			add(new Area(new Ellipse2D.Double(Utils.toPixels(center.x - diameter * 0.5), Utils.toPixels(center.y - diameter * 0.5), Utils.toPixels(diameter), Utils.toPixels(diameter))));
 		}
 	}
 	
-	public static class Circle extends GeometricPrimitive
+	public static class Rectangle extends Area
 	{
-		public boolean exposure;
-		public int diameter;
-		public Coordinate center;
-		public double rotation; // TODO is this necessary?
-		
-		public Circle(boolean exposure, int diameter, Coordinate center, double rotation)
+		public Rectangle(int width, int height, Coordinate center, double rotation)
 		{
-			this.exposure = exposure;
-			this.diameter = diameter;
-			this.center = center;
-			this.rotation = rotation;
-		}
-		
-		@Override
-		public GeometricPrimitive clone()
-		{
-			return new Circle(exposure, diameter, center, rotation);
-		}
-		
-		@Override
-		public void render(Graphics2D g)
-		{
-			AffineTransform a = g.getTransform();
-			g.translate(Utils.toPixels(offset.x), Utils.toPixels(offset.y));
+			add(new Area(new Rectangle2D.Double(Utils.toPixels(center.x - width * 0.5), Utils.toPixels(center.y - height * 0.5), Utils.toPixels(width), Utils.toPixels(height))));
 			
-			g.setColor(exposure ? Color.WHITE : Color.BLACK);
-			
-			g.fill(new Ellipse2D.Double(Utils.toPixels(center.x - diameter * 0.5), Utils.toPixels(center.y - diameter * 0.5), Utils.toPixels(diameter), Utils.toPixels(diameter)));
-			
-//			g.fillOval(Utils.toPixels(center.x - diameter * 0.5), Utils.toPixels(center.y - diameter * 0.5), Utils.toPixels(diameter), Utils.toPixels(diameter));
-			
-//			System.out.println(String.format("X: %d, Y: %d", center.x + offset.x, center.y + offset.y));
-			
-			g.setTransform(a);
+			AffineTransform transform = new AffineTransform();
+			transform.rotate(Utils.toRads(rotation));
+			transform(transform);
 		}
 	}
 	
-	public static class Line extends GeometricPrimitive
+	public static class VectorLine extends Area
 	{
-		public boolean exposure;
-		public int width;
-		public Coordinate start;
-		public Coordinate end;
-		public double rotation;
-		
-		@Override
-		public void render(Graphics2D g)
+		public VectorLine(int width, Coordinate start, Coordinate end, double rotation)
 		{
-		}
-	}
-	
-	public static class Rectangle extends GeometricPrimitive
-	{
-		public boolean exposure;
-		public int width, height;
-		public Coordinate center;
-		public double rotation;
-		
-		public Rectangle(boolean exposure, int width, int height, Coordinate center, double rotation)
-		{
-			this.exposure = exposure;
-			this.width = width;
-			this.height = height;
-			this.center = center;
-			this.rotation = rotation;
-		}
-		
-		@Override
-		public GeometricPrimitive clone()
-		{
-			return new Rectangle(exposure, width, height, center, rotation);
-		}
-		
-		@Override
-		public void render(Graphics2D g)
-		{
-			AffineTransform a = g.getTransform();
-			g.translate(Utils.toPixels(offset.x), Utils.toPixels(offset.y));
+			double length = Math.hypot(start.x - end.x, start.y - end.y);
+			double angle = Math.atan2(start.x - end.x, start.y - end.y);
 			
-			g.setColor(exposure ? Color.WHITE : Color.BLACK);
-			g.fill(new Rectangle2D.Double(Utils.toPixels(center.x - width * 0.5), Utils.toPixels(center.y - height * 0.5), Utils.toPixels(width), Utils.toPixels(height)));
-//			g.fillRect(Utils.toPixels(center.x - width * 0.5), Utils.toPixels(center.y - height * 0.5), Utils.toPixels(width), Utils.toPixels(height));
+			// TODO FIXME
 			
-			g.setTransform(a);
+			add(new Area(new Line2D.Double(Utils.toPixels(start.x), Utils.toPixels(start.y), Utils.toPixels(end.x), Utils.toPixels(end.y))));
+			
+			AffineTransform transform = new AffineTransform();
+			transform.rotate(Utils.toRads(rotation));
+			transform(transform);
 		}
 	}
 	
-	public static class Outline extends GeometricPrimitive
+	public static class Outline extends Area
 	{
-		public boolean exposure;
-		public int numVertices;
-		public Coordinate points[];
-		public double rotation;
-		
-		@Override
-		public void render(Graphics2D g)
+		public Outline(int numVertices, Coordinate[] points, double rotation)
 		{
+			Path2D p = new Path2D.Double();
+			for (int i = 0; i < numVertices; i++)
+			{
+				double x = Utils.toPixels(points[i].x);
+				double y = Utils.toPixels(points[i].y);
+				if (i == 0)
+					p.moveTo(x, y);
+				else
+					p.lineTo(x, y);
+			}
+			add(new Area(p));
+			
+			AffineTransform transform = new AffineTransform();
+			transform.rotate(Utils.toRads(rotation));
+			transform(transform);
 		}
 	}
 	
-	public static class Polygon extends GeometricPrimitive
+	public static class Polygon extends Area
 	{
-		public boolean exposure;
-		public int numVertices, diameter;
-		public Coordinate center;
-		public double rotation;
-		
-		@Override
-		public void render(Graphics2D g)
+		public Polygon(int numVertices, int diameter, Coordinate center, double rotation)
 		{
+			Path2D p = new Path2D.Double();
+			double radius = diameter * 0.5;
+			for (int i = 0; i < numVertices; i++)
+			{
+				double angle = i * (2 * Math.PI / numVertices);
+				if (i == 0)
+					p.moveTo(Utils.toPixels(center.x + Math.cos(angle) * radius), Utils.toPixels(center.y + Math.sin(angle) * radius));
+				else
+					p.lineTo(Utils.toPixels(center.x + Math.cos(angle) * radius), Utils.toPixels(center.y + Math.sin(angle) * radius));
+			}
+			add(new Area(p));
+			
+			AffineTransform transform = new AffineTransform();
+			transform.rotate(Utils.toRads(rotation));
+			transform(transform);
 		}
 	}
 	
-	public static class Thermal extends GeometricPrimitive
+	public static class Thermal extends Area
 	{
-		public Coordinate center;
-		public int outerDiameter, innerDiameter, gap;
-		public double rotation;
-		
-		@Override
-		public void render(Graphics2D g)
+		public Thermal(Coordinate center, int outerDiameter, int innerDiameter, int gap, double rotation) // FIXME Test this
 		{
+			Area outerHole = new Area(new Ellipse2D.Double(Utils.toPixels(center.x - outerDiameter * 0.5), Utils.toPixels(center.y - outerDiameter * 0.5), Utils.toPixels(outerDiameter), Utils.toPixels(outerDiameter)));
+			Area innerHole = new Area(new Ellipse2D.Double(Utils.toPixels(center.x - outerDiameter * 0.5), Utils.toPixels(center.y - outerDiameter * 0.5), Utils.toPixels(outerDiameter), Utils.toPixels(outerDiameter)));
+			Area rectX = new Area(new Rectangle2D.Double(Utils.toPixels(center.x), Utils.toPixels(center.y), Utils.toPixels(outerDiameter), Utils.toPixels(gap)));
+			Area rectY = new Area(new Rectangle2D.Double(Utils.toPixels(center.x), Utils.toPixels(center.y), Utils.toPixels(gap), Utils.toPixels(outerDiameter)));
+			
+			add(outerHole);
+			subtract(innerHole);
+			subtract(rectX);
+			subtract(rectY);
+			
+			AffineTransform transform = new AffineTransform();
+			transform.rotate(Utils.toRads(rotation));
+			transform(transform);
 		}
 	}
 	

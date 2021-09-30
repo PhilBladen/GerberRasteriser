@@ -39,6 +39,11 @@ public class Utils
 		return Config.getConfig().nanosToPixels * d;
 	}
 	
+	public static double toRads(double deg)
+	{
+		return 2 * Math.PI * deg / 360.0;
+	}
+	
 	public static int countMatchingGroups(Matcher m)
 	{
 		int numGroups = m.groupCount();
