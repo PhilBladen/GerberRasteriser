@@ -126,6 +126,17 @@ public class Aperture
 	
 	public static class Custom extends Aperture
 	{
-		// FIXME
+		public Custom()
+		{
+			
+		}
+		
+		public void addPrimitive(Area primitive, boolean exposure)
+		{
+			if (exposure)
+				area.add(primitive);
+			else
+				area.subtract(primitive);
+		}
 	}
 }

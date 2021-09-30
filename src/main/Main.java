@@ -3,6 +3,9 @@ package main;
 import static main.Utils.err;
 import static main.Utils.log;
 
+import java.awt.geom.AffineTransform;
+import java.awt.geom.Area;
+import java.awt.geom.Point2D;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -12,6 +15,7 @@ import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import main.Aperture.Custom;
 import main.Config.UnitType;
 import main.GeometricPrimitives.Coordinate;
 
@@ -117,7 +121,160 @@ public class Main
 	
 	private void addApertureTemplate(ExtendedCommand cmd, String ID)
 	{
-		// TODO
+		Custom macroAperture = new Custom();
+		for (int wordIndex = 1; wordIndex < cmd.words.size(); wordIndex++)
+		{
+			String word = cmd.words.get(wordIndex);
+			
+			if (word.contains("$"))
+				continue;
+//				throw new RuntimeException("Cry"); // FIXME
+			
+			String parts[] = word.split(",");
+			
+			int code = Integer.parseInt(parts[0]);
+			Area primitive = null;
+			switch (code)
+			{
+				case 0: // Comment
+					break;
+				case 1: // Circle
+				{
+					if (parts.length != 5 && parts.length != 6)
+						throw new RuntimeException();
+					
+					double diameter = Utils.convertUnits(Double.parseDouble(parts[2]));
+					double centerX = Utils.convertUnits(Double.parseDouble(parts[3]));
+					double centerY = Utils.convertUnits(Double.parseDouble(parts[4]));
+					double rotation;
+					if (parts.length == 5)
+						rotation = 0;
+					else
+						rotation = Utils.toRads(Double.parseDouble(parts[5]));
+					
+					AffineTransform a = new AffineTransform();
+					a.rotate(rotation);
+					Point2D newCenter = a.transform(new Point2D.Double(centerX, centerY), null);
+					
+					primitive = new GeometricPrimitives.Circle((int) diameter, new Coordinate((int) newCenter.getX(), (int) newCenter.getY()), rotation);
+					
+					break;
+				}
+				case 20: // Vector line
+				{
+					if (parts.length != 8)
+						throw new RuntimeException();
+					
+					double width = Utils.convertUnits(Double.parseDouble(parts[2]));
+					double startX = Utils.convertUnits(Double.parseDouble(parts[3]));
+					double startY = Utils.convertUnits(Double.parseDouble(parts[4]));
+					double endX = Utils.convertUnits(Double.parseDouble(parts[5]));
+					double endY = Utils.convertUnits(Double.parseDouble(parts[6]));
+					double rotation = Utils.toRads(Double.parseDouble(parts[7]));
+					
+					AffineTransform a = new AffineTransform();
+					a.rotate(rotation);
+					Point2D newStart = a.transform(new Point2D.Double(startX, startY), null);
+					Point2D newEnd = a.transform(new Point2D.Double(endX, endY), null);
+					
+					primitive = new GeometricPrimitives.VectorLine((int) width, new Coordinate((int) newStart.getX(), (int) newStart.getY()), new Coordinate((int) newEnd.getX(), (int) newEnd.getY()), rotation);
+					
+					break;
+				}
+				case 21: // Rectangle
+				{
+					if (parts.length != 7)
+						throw new RuntimeException();
+					
+					double width = Utils.convertUnits(Double.parseDouble(parts[2]));
+					double height = Utils.convertUnits(Double.parseDouble(parts[3]));
+					double centerX = Utils.convertUnits(Double.parseDouble(parts[4]));
+					double centerY = Utils.convertUnits(Double.parseDouble(parts[5]));
+					double rotation = Utils.toRads(Double.parseDouble(parts[6]));
+					
+					AffineTransform a = new AffineTransform();
+					a.rotate(rotation);
+					Point2D newCenter = a.transform(new Point2D.Double(centerX, centerY), null);
+					
+					primitive = new GeometricPrimitives.Rectangle((int) width, (int) height, new Coordinate((int) newCenter.getX(), (int) newCenter.getY()), rotation);
+					
+					break;
+				}
+				case 4: // Outline
+				{
+					int numVertices = Integer.parseInt(parts[2]) + 1;
+					int expectedNumArgs = 4 + 2 * numVertices;
+					if (parts.length != expectedNumArgs)
+						throw new RuntimeException("Unexpected number of arguments for outline template.");
+					
+					double rotation = Utils.toRads(Double.parseDouble(parts[expectedNumArgs - 1]));
+					
+					AffineTransform transform = new AffineTransform();
+					transform.rotate(rotation);
+					
+					ArrayList<Coordinate> coordinates = new ArrayList<>();
+					
+					for (int i = 0; i < numVertices; i++)
+					{
+						double x = Utils.convertUnits(Double.parseDouble(parts[3 + 2 * i]));
+						double y = Utils.convertUnits(Double.parseDouble(parts[4 + 2 * i]));
+						
+						Point2D transformedPoint = transform.transform(new Point2D.Double(x, y), null);
+						coordinates.add(new Coordinate((int) transformedPoint.getX(), (int) transformedPoint.getY()));
+					}
+					
+					primitive = new GeometricPrimitives.Outline(numVertices, coordinates, rotation);
+					
+					break;
+				}
+				case 5: // Polygon
+				{
+					if (parts.length != 7)
+						throw new RuntimeException();
+					
+					int numVertices = Integer.parseInt(parts[2]);
+					double centerX = Utils.convertUnits(Double.parseDouble(parts[3]));
+					double centerY = Utils.convertUnits(Double.parseDouble(parts[4]));
+					double diameter = Utils.convertUnits(Double.parseDouble(parts[5]));
+					double rotation = Utils.toRads(Double.parseDouble(parts[6]));
+					
+					AffineTransform a = new AffineTransform();
+					a.rotate(rotation);
+					Point2D newCenter = a.transform(new Point2D.Double(centerX, centerY), null);
+					
+					primitive = new GeometricPrimitives.Polygon(numVertices, (int) diameter, new Coordinate((int) newCenter.getX(), (int) newCenter.getY()), rotation);
+					
+					break;
+				}
+				case 7: // Thermal
+				{
+					if (parts.length != 7)
+						throw new RuntimeException();
+					
+					double centerX = Utils.convertUnits(Double.parseDouble(parts[1]));
+					double centerY = Utils.convertUnits(Double.parseDouble(parts[2]));
+					double outerDiameter = Utils.convertUnits(Double.parseDouble(parts[3]));
+					double innerDiameter = Utils.convertUnits(Double.parseDouble(parts[4]));
+					double gapThickness = Utils.convertUnits(Double.parseDouble(parts[5]));
+					double rotation = Utils.toRads(Double.parseDouble(parts[6]));
+					
+					AffineTransform a = new AffineTransform();
+					a.rotate(rotation);
+					Point2D newCenter = a.transform(new Point2D.Double(centerX, centerY), null);
+					
+					primitive = new GeometricPrimitives.Thermal(new Coordinate((int) newCenter.getX(), (int) newCenter.getY()), (int) outerDiameter, (int) innerDiameter, (int) gapThickness, rotation);
+					
+					break;
+				}
+				default:
+					throw new RuntimeException("Invalid macro primitive code.");
+			}
+			
+			macroAperture.addPrimitive(primitive, code == 7 || Integer.parseInt(parts[1]) == 1);
+		}		
+		
+		apertureTemplateDictionary.put(ID, macroAperture);
+		log("Aperture template " + ID + " added.");
 	}
 	
 	private void flash(Coordinate position)
@@ -232,22 +389,22 @@ public class Main
 				if (numArgs == 2)
 					aperture = new Aperture.Polygon(argsconv[0], (int) args[1]);
 				else if (numArgs == 3)
-					aperture = new Aperture.Polygon(argsconv[0], (int) args[1], args[2]);
+					aperture = new Aperture.Polygon(argsconv[0], (int) args[1], Utils.toRads(args[2]));
 				else if (numArgs == 4)
-					aperture = new Aperture.Polygon(argsconv[0], (int) args[1], args[2], argsconv[3]);
+					aperture = new Aperture.Polygon(argsconv[0], (int) args[1], Utils.toRads(args[2]), argsconv[3]);
 				else
 					throw new RuntimeException("Unexpected number of arguments for rectangle aperture.");
 			}
 			else
 			{
 				// Custom?
+				aperture = apertureTemplateDictionary.get(type);
+				if (aperture == null)
+					throw new RuntimeException("Aperture template " + type + " requested but not found.");
 			}
 			
 			if (aperture == null)
-			{
-//				throw new RuntimeException("Aperture failed to be created.");
-				// TODO
-			}
+				throw new RuntimeException("Aperture failed to be created.");
 			else
 				apertureDictionary.put(id, aperture);
 		}
@@ -265,8 +422,6 @@ public class Main
 			String apertureTemplateID = m.group(1);
 			
 			addApertureTemplate(extCmd, apertureTemplateID);
-			
-			log("Aperture template " + apertureTemplateID + " added.");
 		}
 		else if (commandWord.startsWith("D")) // Operation
 		{
@@ -498,22 +653,15 @@ public class Main
 		else
 			err("Skipped " + command);
 	}
-
-	public Main()
+	
+	private ArrayList<Command> parseGerberFile(File file)
 	{
-		log("Running " + APP_NAME + " " + APP_VERSION);
-
-		File testGerberFile = new File("E:/PJB/Programming/Java/Workspace/GerberRasteriser/Reference files/GerberTest/GerberFiles/copper_top.gbr");
-		if (!testGerberFile.exists())
+		if (!file.exists())
 			throw new RuntimeException("Failed to open gerber file. Are you sure it exists?");
 		log("Found gerber file.");
 		
-		renderer = new Renderer();
-		renderer.createWindow();
-
-		Timer.tic();
 		ArrayList<Command> commands = new ArrayList<>();
-		try (InputStream in = new BufferedInputStream(new FileInputStream(testGerberFile)))
+		try (InputStream in = new BufferedInputStream(new FileInputStream(file)))
 		{
 			int c;
 			ParserState parserState = ParserState.NONE;
@@ -569,18 +717,25 @@ public class Main
 		{
 			e.printStackTrace();
 		}
+		return commands;
+	}
+
+	public Main()
+	{
+		log("Running " + APP_NAME + " " + APP_VERSION);
+		
+		renderer = new Renderer();
+		renderer.createWindow();
+
+		Timer.tic();
+		ArrayList<Command> commands = parseGerberFile(new File("Reference files/STAR-XL CCT.GTL"));
+//		ArrayList<Command> commands = parseGerberFile(new File("E:/PJB/Programming/Java/Workspace/GerberRasteriser/Reference files/GerberTest/GerberFiles/copper_top.gbr"));
 		log("Parsed gerber file in " + String.format("%.2fs.", Timer.toc() * 0.001) + "\n");
 
 		Timer.tic();
 		for (Command command : commands)
-		{
 			processCommand(command);
-		}
 		log("Processed gerber file in " + String.format("%.2fs.", Timer.toc() * 0.001) + "\n");
-		
-//		for (Aperture a : apertureDictionary)
-		
-//		renderer.primitives
 		
 		renderer.redraw();
 

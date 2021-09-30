@@ -6,6 +6,7 @@ import java.awt.geom.Ellipse2D;
 import java.awt.geom.Line2D;
 import java.awt.geom.Path2D;
 import java.awt.geom.Rectangle2D;
+import java.util.ArrayList;
 
 public class GeometricPrimitives
 {	
@@ -24,7 +25,7 @@ public class GeometricPrimitives
 			add(new Area(new Rectangle2D.Double(Utils.toPixels(center.x - width * 0.5), Utils.toPixels(center.y - height * 0.5), Utils.toPixels(width), Utils.toPixels(height))));
 			
 			AffineTransform transform = new AffineTransform();
-			transform.rotate(Utils.toRads(rotation));
+			transform.rotate(rotation);
 			transform(transform);
 		}
 	}
@@ -41,20 +42,21 @@ public class GeometricPrimitives
 			add(new Area(new Line2D.Double(Utils.toPixels(start.x), Utils.toPixels(start.y), Utils.toPixels(end.x), Utils.toPixels(end.y))));
 			
 			AffineTransform transform = new AffineTransform();
-			transform.rotate(Utils.toRads(rotation));
+			transform.rotate(rotation);
 			transform(transform);
 		}
 	}
 	
 	public static class Outline extends Area
 	{
-		public Outline(int numVertices, Coordinate[] points, double rotation)
+		public Outline(int numVertices, ArrayList<Coordinate> points, double rotation)
 		{
 			Path2D p = new Path2D.Double();
 			for (int i = 0; i < numVertices; i++)
 			{
-				double x = Utils.toPixels(points[i].x);
-				double y = Utils.toPixels(points[i].y);
+				Coordinate point = points.get(i);
+				double x = Utils.toPixels(point.x);
+				double y = Utils.toPixels(point.y);
 				if (i == 0)
 					p.moveTo(x, y);
 				else
@@ -63,7 +65,7 @@ public class GeometricPrimitives
 			add(new Area(p));
 			
 			AffineTransform transform = new AffineTransform();
-			transform.rotate(Utils.toRads(rotation));
+			transform.rotate(rotation);
 			transform(transform);
 		}
 	}
@@ -85,7 +87,7 @@ public class GeometricPrimitives
 			add(new Area(p));
 			
 			AffineTransform transform = new AffineTransform();
-			transform.rotate(Utils.toRads(rotation));
+			transform.rotate(rotation);
 			transform(transform);
 		}
 	}
@@ -105,7 +107,7 @@ public class GeometricPrimitives
 			subtract(rectY);
 			
 			AffineTransform transform = new AffineTransform();
-			transform.rotate(Utils.toRads(rotation));
+			transform.rotate(rotation);
 			transform(transform);
 		}
 	}
