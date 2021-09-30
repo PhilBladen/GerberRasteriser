@@ -46,6 +46,8 @@ public class Aperture
 	
 	public static class Circle extends Aperture
 	{
+		public int diameter;
+		
 		public Circle(int diameter)
 		{
 			this(diameter, 0);
@@ -53,6 +55,8 @@ public class Aperture
 		
 		public Circle(int diameter, int holeDiameter)
 		{
+			this.diameter = diameter;
+			
 			area.add(new GeometricPrimitives.Circle(diameter, GeometricPrimitives.origin, 0));
 			area.subtract(new GeometricPrimitives.Circle(holeDiameter, GeometricPrimitives.origin, 0));
 		}

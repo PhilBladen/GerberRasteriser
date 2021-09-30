@@ -44,6 +44,11 @@ public class Utils
 		return 2 * Math.PI * deg / 360.0;
 	}
 	
+	public static double toDeg(double rad)
+	{
+		return 360.0 * rad / (2 * Math.PI);
+	}
+	
 	public static int countMatchingGroups(Matcher m)
 	{
 		int numGroups = m.groupCount();
@@ -67,5 +72,20 @@ public class Utils
 	public static void err(Object o)
 	{
 		System.err.println(o.toString());
+	}
+	
+	public static class Timer
+	{
+		private static long start_ms;
+
+		public static void tic()
+		{
+			start_ms = System.currentTimeMillis();
+		}
+
+		public static long toc()
+		{
+			return System.currentTimeMillis() - start_ms;
+		}
 	}
 }
