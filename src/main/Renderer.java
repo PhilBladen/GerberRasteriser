@@ -8,7 +8,9 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Image;
 import java.awt.RenderingHints;
+import java.awt.Toolkit;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
@@ -17,17 +19,19 @@ import java.awt.event.MouseWheelListener;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.awt.image.ColorModel;
+import java.awt.image.DataBufferByte;
+import java.awt.image.DataBufferInt;
+import java.awt.image.MemoryImageSource;
 import java.awt.image.Raster;
 import java.awt.image.WritableRaster;
-import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 
-import javax.imageio.ImageIO;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
+
+import main.Utils.Timer;
 
 public class Renderer
 {
@@ -188,53 +192,67 @@ public class Renderer
 			// This bit is horribly inefficient,
 			// getting individual pixels rather than all at once.
 			
-//			float[] srcData = src.getPixels(0, 0, w1, h1, (float[]) null);
+			byte[] srcData = new byte[w1 * h1];
+			src.getDataElements(0, 0, w1, h1, srcData);
+			
+			
+			int[] dstData = new int[w1 * h1];
+
 			
 			for (int x = 0; x < dstIn.getWidth(); x++)
 			{
 				for (int y = 0; y < dstIn.getHeight(); y++)
 				{
-					float[] pxSrc = null;
-					pxSrc = src.getPixel(x, y, pxSrc);
-					float[] pxDst = null;
-					pxDst = dstIn.getPixel(x, y, pxDst);
-
-					float alpha = 255;
-					if (pxSrc.length > 3)
-					{
-						alpha = pxSrc[3];
-					}
+					if (srcData[y * w1 + x] != 0)
+						dstData[y * w1 + x] = 0x00FFFFFF;
 					
-					if (fun == 0)
-					{
-						pxSrc[1] = 0;
-						pxSrc[2] = 0;
-					}
-					else if (fun == 1)
-					{
-						pxSrc[0] = 0;
-						pxSrc[2] = 0;
-					}
-					else
-					{
-						pxSrc[0] = 0;
-						pxSrc[1] = 0;
-					}
-					
-
-					for (int i = 0; i < 3 && i < minCh; i++)
-					{
-						pxDst[i] = Math.min(255, (pxSrc[i] * (alpha / 255)) + (pxDst[i]));
-						dstOut.setPixel(x, y, pxDst);
-					}
+//					float[] pxSrc = null;
+//					pxSrc = src.getPixel(x, y, pxSrc);
+//					float[] pxDst = null;
+//					pxDst = dstIn.getPixel(x, y, pxDst);
+//
+//					float alpha = 255;
+//					if (pxSrc.length > 3)
+//					{
+//						alpha = pxSrc[3];
+//					}
+//					
+////					if (fun == 0)
+////					{
+////						pxSrc[1] = 0;
+////						pxSrc[2] = 0;
+////					}
+////					else if (fun == 1)
+////					{
+////						pxSrc[0] = 0;
+////						pxSrc[2] = 0;
+////					}
+////					else
+////					{
+////						pxSrc[0] = 0;
+////						pxSrc[1] = 0;
+////					}
+////					
+//
+//					for (int i = 0; i < 3 && i < minCh; i++)
+//					{
+//						pxDst[i] = Math.min(255, (pxSrc[i] * (alpha / 255)) + (pxDst[i]));
+//						dstOut.setPixel(x, y, pxDst);
+//					}
 				}
 			}
+			
+
+			dstOut.setDataElements(0, 0, w1, h1, dstData);
 		}
 
 		public void dispose()
 		{
 		}
 	}
+	
+	int numRunningThreads = 0;
+	Object lock = new Object();
 
 	public void addLayers(Layer... layers)
 	{
@@ -243,12 +261,14 @@ public class Renderer
 
 		ArrayList<BufferedImage> layerImages = new ArrayList<>();
 		
-//		int size = 32000;
-		int size = 1000;
+//		int size = 42000;
+		int size = 10000;
 
 		for (Layer l : layers)
 		{
-			BufferedImage bufferedImage = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+			Timer.tic();
+			
+			BufferedImage bufferedImage = new BufferedImage(size, size, BufferedImage.TYPE_BYTE_GRAY);
 			layerImages.add(bufferedImage);
 
 			Graphics2D layerG2D = (Graphics2D) bufferedImage.getGraphics();
@@ -262,30 +282,101 @@ public class Renderer
 			layerG2D.setColor(Color.WHITE);
 			for (Renderable r : l.objects)
 				r.render(layerG2D);
+			
+			Utils.log("Layer render time: " + (Timer.toc() * 0.001));
+		}
+		
+		everything = new BufferedImage(size, size, BufferedImage.TYPE_INT_RGB);		
+		
+		Raster l1 = layerImages.get(0).getData();
+		Raster l2 = layerImages.get(1).getData();
+		Raster l3 = layerImages.get(2).getData();
+				
+		byte[] srcData1 = ((DataBufferByte) l1.getDataBuffer()).getData();
+		byte[] srcData2 = ((DataBufferByte) l2.getDataBuffer()).getData();
+		byte[] srcData3 = ((DataBufferByte) l3.getDataBuffer()).getData();
+		
+		int[] dstData = ((DataBufferInt) everything.getData().getDataBuffer()).getData();
+		
+		int numCores = 4;
+		
+		final int parallelHeight = size / numCores;
+		
+		Timer.tic();
+				
+		for (int threadIndex = 0; threadIndex < numCores; threadIndex++)
+		{
+			final int actualThreadIndex = threadIndex;
+			
+			numRunningThreads++;
+			
+			new Thread(new Runnable()
+			{
+				@Override
+				public void run()
+				{
+//					int startRow = actualThreadIndex * parallelHeight;
+//					int endRow = (actualThreadIndex + 1) * parallelHeight;
+//					
+//					for (int rowIndex = startRow; rowIndex < endRow; rowIndex++)
+//					{
+//						if (rowIndex % 250 == 0)
+//							Utils.log(rowIndex);
+//						
+//						byte[] srcData1 = new byte[size];
+//						l1.getDataElements(0, rowIndex, size, 1, srcData1);
+//						
+//						byte[] srcData2 = new byte[size * size];
+//						l2.getDataElements(0, rowIndex, size, 1, srcData2);
+//						
+//						byte[] srcData3 = new byte[size * size];
+//						l3.getDataElements(0, rowIndex, size, 1, srcData3);
+//						
+//						int[] dstData = new int[size];
+//						
+//						for (int pixelIndex = 0; pixelIndex < size; pixelIndex++)
+//						{
+//							dstData[pixelIndex] |= srcData1[pixelIndex] & 0x000000FF;
+//							dstData[pixelIndex] |= (srcData2[pixelIndex] << 8) & 0x0000FF00;
+//							dstData[pixelIndex] |= (srcData3[pixelIndex] << 16) & 0x00FF0000;
+//						}
+//						
+//						everything.getRaster().setDataElements(0, rowIndex, size, 1, dstData);
+//					}
+					
+					int startPixel = actualThreadIndex * parallelHeight * size;
+					int endPixel = (actualThreadIndex + 1) * parallelHeight * size;
+										
+					for (int pixelIndex = startPixel; pixelIndex < endPixel; pixelIndex++)
+					{
+						dstData[pixelIndex] |= srcData1[pixelIndex] & 0x000000FF;
+						dstData[pixelIndex] |= (srcData2[pixelIndex] << 8) & 0x0000FF00;
+						dstData[pixelIndex] |= (srcData3[pixelIndex] << 16) & 0x00FF0000;
+					}
+					
+					synchronized (lock)
+					{						
+						numRunningThreads--;
+					}
+				}
+			}).start();
+		}
+		
+		while (numRunningThreads > 0)
+		{
+			try
+			{
+				Thread.sleep(1);
+			}
+			catch (InterruptedException e)
+			{
+			}
 		}
 
-		everything = new BufferedImage(size, size, BufferedImage.TYPE_INT_RGB);
-		Graphics2D layerG2D = (Graphics2D) everything.getGraphics();
-//		layerG2D.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+		everything.getRaster().setDataElements(0, 0, size, size, dstData);
 		
-		layerG2D.setColor(Color.WHITE);
-		fun = 2;
-		layerG2D.setXORMode(Color.YELLOW);
-		layerG2D.drawImage(layerImages.get(0), 0, 0, null);
-		
-//		layerG2D.setComposite(new AdditiveComposite());
+		Utils.log("Composite time: " + (Timer.toc() * 0.001));
 
-//		layerG2D.setColor(Color.BLUE);
-		fun = 0;
-		layerG2D.setXORMode(Color.CYAN);
-		layerG2D.drawImage(layerImages.get(1), 0, 0, null);
-
-//		layerG2D.setColor(Color.GREEN);
-		fun = 1;
-		layerG2D.setXORMode(Color.MAGENTA);
-		layerG2D.drawImage(layerImages.get(2), 0, 0, null);
-		
-//		layerG2D.get
 		
 //		File outputfile = new File("layers.png");
 //		try

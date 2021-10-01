@@ -611,7 +611,6 @@ public class Layer
 					switch (apertureNumber)
 					{
 						case 1: // Interpolate without coordinates: does the same thing as a flash but is technically a line
-
 							if (interpolationMode == InterpolationMode.NONE)
 								throw new RuntimeException("Interpolation requested but interpolation mode not set.");
 
