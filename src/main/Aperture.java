@@ -9,7 +9,7 @@ import main.Layer.Modifiers;
 
 public class Aperture implements Renderable
 {
-	private Modifiers modifiers;
+	private Modifiers modifiers; // TODO unused
 	private AffineTransform transform = null;
 	protected Area area = new Area();
 	

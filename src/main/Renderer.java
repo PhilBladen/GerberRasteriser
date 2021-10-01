@@ -2,6 +2,8 @@ package main;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Composite;
+import java.awt.CompositeContext;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
@@ -13,8 +15,15 @@ import java.awt.event.MouseMotionAdapter;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
 import java.awt.geom.AffineTransform;
+import java.awt.image.BufferedImage;
+import java.awt.image.ColorModel;
+import java.awt.image.Raster;
+import java.awt.image.WritableRaster;
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 
+import javax.imageio.ImageIO;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.UIManager;
@@ -140,10 +149,153 @@ public class Renderer
 		});
 	}
 
+	BufferedImage everything;
+
+	public class AdditiveComposite implements Composite
+	{
+		public AdditiveComposite()
+		{
+			super();
+		}
+
+		public CompositeContext createContext(ColorModel srcColorModel, ColorModel dstColorModel, RenderingHints hints)
+		{
+			return new AdditiveCompositeContext();
+		}
+	}
+	
+	public int fun = 0;
+
+	public class AdditiveCompositeContext implements CompositeContext
+	{
+		public AdditiveCompositeContext()
+		{
+		};
+
+		public void compose(Raster src, Raster dstIn, WritableRaster dstOut)
+		{
+			int w1 = src.getWidth();
+			int h1 = src.getHeight();
+			int chan1 = src.getNumBands();
+			int w2 = dstIn.getWidth();
+			int h2 = dstIn.getHeight();
+			int chan2 = dstIn.getNumBands();
+
+			int minw = Math.min(w1, w2);
+			int minh = Math.min(h1, h2);
+			int minCh = Math.min(chan1, chan2);
+
+			// This bit is horribly inefficient,
+			// getting individual pixels rather than all at once.
+			
+//			float[] srcData = src.getPixels(0, 0, w1, h1, (float[]) null);
+			
+			for (int x = 0; x < dstIn.getWidth(); x++)
+			{
+				for (int y = 0; y < dstIn.getHeight(); y++)
+				{
+					float[] pxSrc = null;
+					pxSrc = src.getPixel(x, y, pxSrc);
+					float[] pxDst = null;
+					pxDst = dstIn.getPixel(x, y, pxDst);
+
+					float alpha = 255;
+					if (pxSrc.length > 3)
+					{
+						alpha = pxSrc[3];
+					}
+					
+					if (fun == 0)
+					{
+						pxSrc[1] = 0;
+						pxSrc[2] = 0;
+					}
+					else if (fun == 1)
+					{
+						pxSrc[0] = 0;
+						pxSrc[2] = 0;
+					}
+					else
+					{
+						pxSrc[0] = 0;
+						pxSrc[1] = 0;
+					}
+					
+
+					for (int i = 0; i < 3 && i < minCh; i++)
+					{
+						pxDst[i] = Math.min(255, (pxSrc[i] * (alpha / 255)) + (pxDst[i]));
+						dstOut.setPixel(x, y, pxDst);
+					}
+				}
+			}
+		}
+
+		public void dispose()
+		{
+		}
+	}
+
 	public void addLayers(Layer... layers)
 	{
 		for (Layer l : layers)
 			this.layers.add(l);
+
+		ArrayList<BufferedImage> layerImages = new ArrayList<>();
+		
+//		int size = 32000;
+		int size = 1000;
+
+		for (Layer l : layers)
+		{
+			BufferedImage bufferedImage = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+			layerImages.add(bufferedImage);
+
+			Graphics2D layerG2D = (Graphics2D) bufferedImage.getGraphics();
+			
+			layerG2D.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+			
+			// Flip
+			layerG2D.translate(0, size);
+			layerG2D.scale(1, -1);
+
+			layerG2D.setColor(Color.WHITE);
+			for (Renderable r : l.objects)
+				r.render(layerG2D);
+		}
+
+		everything = new BufferedImage(size, size, BufferedImage.TYPE_INT_RGB);
+		Graphics2D layerG2D = (Graphics2D) everything.getGraphics();
+//		layerG2D.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+		
+		layerG2D.setColor(Color.WHITE);
+		fun = 2;
+		layerG2D.setXORMode(Color.YELLOW);
+		layerG2D.drawImage(layerImages.get(0), 0, 0, null);
+		
+//		layerG2D.setComposite(new AdditiveComposite());
+
+//		layerG2D.setColor(Color.BLUE);
+		fun = 0;
+		layerG2D.setXORMode(Color.CYAN);
+		layerG2D.drawImage(layerImages.get(1), 0, 0, null);
+
+//		layerG2D.setColor(Color.GREEN);
+		fun = 1;
+		layerG2D.setXORMode(Color.MAGENTA);
+		layerG2D.drawImage(layerImages.get(2), 0, 0, null);
+		
+//		layerG2D.get
+		
+//		File outputfile = new File("layers.png");
+//		try
+//		{
+//			ImageIO.write(everything, "png", outputfile);
+//		}
+//		catch (IOException e)
+//		{
+//			e.printStackTrace();
+//		}
 	}
 
 	public void finishedLoadingGerber()
@@ -164,6 +316,8 @@ public class Renderer
 		//
 		// scale = 1.0;
 		// currentOffset.set((c.getWidth() - maxX) * 0.5, (maxY - c.getHeight()) * 0.5);
+
+		System.gc();
 
 		updateRenderOffset();
 
@@ -205,15 +359,10 @@ public class Renderer
 				return;
 
 			graphics2D.translate(renderOffset.x, renderOffset.y);
-			graphics2D.scale(scale, -scale);
-			graphics2D.translate(0, -getHeight());
+			graphics2D.scale(scale, scale);
+//			graphics2D.translate(0, -getHeight());
 
-			g.setColor(Color.WHITE);
-			for (Layer l : layers)
-			{
-				for (Renderable r : l.objects)
-					r.render(graphics2D);
-			}
+			graphics2D.drawImage(everything, 0, 0, null);
 
 			graphics2D.setTransform(transform);
 			g.setFont(new Font("Consolas", Font.PLAIN, 20));

@@ -4,8 +4,10 @@ import static main.Utils.err;
 import static main.Utils.log;
 import static main.Utils.warn;
 
+import java.awt.AlphaComposite;
 import java.awt.BasicStroke;
 import java.awt.Color;
+import java.awt.Composite;
 import java.awt.Graphics2D;
 import java.awt.Shape;
 import java.awt.geom.Arc2D;
@@ -118,13 +120,17 @@ public class Layer
 		@Override
 		public void render(Graphics2D g)
 		{
+			Composite c = g.getComposite();
+			
 			if (modifiers.polarity == Polarity.DARK)
 				g.setColor(Color.WHITE);
 			else
-				g.setColor(Color.BLACK);
+				g.setComposite(AlphaComposite.Clear);
 
 			g.setStroke(new BasicStroke((float) Utils.toPixels(thickness), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
 			g.draw(s);
+			
+			g.setComposite(c); // Restore
 		}
 
 		@Override
@@ -148,13 +154,17 @@ public class Layer
 		@Override
 		public void render(Graphics2D g)
 		{
+			Composite c = g.getComposite();
+			
 			if (modifiers.polarity == Polarity.DARK)
 				g.setColor(Color.WHITE);
 			else
-				g.setColor(Color.BLACK);
+				g.setComposite(AlphaComposite.Clear);
 
 			// g.setStroke(new BasicStroke((float) 1, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
 			g.fill(p);
+			
+			g.setComposite(c); // Restore
 		}
 
 		@Override
@@ -860,6 +870,10 @@ public class Layer
 
 						// ...since a positive angle is subtended (note: this should now always be positive by definition).
 						double angleSubtended_deg = endAngle_deg - startAngle_deg;
+						if (angleSubtended_deg == 0)
+							angleSubtended_deg = 360;
+						
+						log("SUBTENDS: " + angleSubtended_deg);
 
 						Arc2D l = new Arc2D.Double();
 						l.setArcByCenter(Utils.toPixels(currentPoint.x + I), Utils.toPixels(currentPoint.y + J), Utils.toPixels(radius), startAngle_deg, angleSubtended_deg, Arc2D.OPEN);
@@ -892,6 +906,10 @@ public class Layer
 
 						// ...since a negative angle is subtended (note: this should now always be negative by definition).
 						double angleSubtended_deg = endAngle_deg - startAngle_deg;
+						if (angleSubtended_deg == 0)
+							angleSubtended_deg = 360;
+						
+						log("SUBTENDS: " + angleSubtended_deg);
 
 						Arc2D l = new Arc2D.Double();
 						l.setArcByCenter(Utils.toPixels(currentPoint.x + I), Utils.toPixels(currentPoint.y + J), Utils.toPixels(radius), startAngle_deg, angleSubtended_deg, Arc2D.OPEN);

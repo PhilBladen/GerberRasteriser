@@ -22,5 +22,6 @@ public class Config
 
 	UnitType units = UnitType.NONE;
 	int multiplier;
+//	double nanosToPixels = 1E-3 / 3.2;
 	double nanosToPixels = 1E-5;
 }
