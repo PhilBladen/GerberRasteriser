@@ -11,4 +11,14 @@ public class Exceptions
 			super(message);
 		}
 	}
+	
+	public static class UnsupportedCommandException extends RuntimeException
+	{
+		private static final long serialVersionUID = -7067336546199367072L;
+
+		public UnsupportedCommandException(String message)
+		{
+			super("Unsupported command: "+ message);
+		}
+	}
 }

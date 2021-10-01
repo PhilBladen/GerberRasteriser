@@ -1,5 +1,7 @@
 package main;
 
+import java.io.OutputStream;
+import java.io.PrintStream;
 import java.util.regex.Matcher;
 
 import main.Config.UnitType;
@@ -66,12 +68,45 @@ public class Utils
 	
 	public static void log(Object o)
 	{
-		System.out.println(o.toString());
+		log(LogLevel.INFO, o);
+	}
+	
+	public static void warn(Object o)
+	{
+		log(LogLevel.WARNING, o);
 	}
 
 	public static void err(Object o)
 	{
-		System.err.println(o.toString());
+		log(LogLevel.ERROR, o);
+	}
+	
+	public enum LogLevel
+	{
+		INFO("INFO"), WARNING("WARN"), ERROR("ERR");
+		
+		String name;
+		LogLevel(String name)
+		{
+			this.name = name;
+		}
+		
+		@Override
+		public String toString()
+		{
+			return name;
+		}
+	}
+	
+	public static void log(LogLevel level, Object o)
+	{
+		PrintStream s;
+		if (level == LogLevel.INFO)
+			s = System.out;
+		else
+			s = System.err;
+		
+		s.println("[" + level.toString() + "] " + o.toString());
 	}
 	
 	public static class Timer

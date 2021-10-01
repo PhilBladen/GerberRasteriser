@@ -1,6 +1,5 @@
 package main;
 
-import java.awt.BasicStroke;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
@@ -8,22 +7,20 @@ import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
-import java.awt.Shape;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
 import java.awt.geom.AffineTransform;
-import java.awt.geom.Line2D;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map.Entry;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
+
+import main.Main.Modifiers;
 
 public class Renderer
 {
@@ -31,60 +28,27 @@ public class Renderer
 	private GerberCanvas c;
 
 	boolean dragging = false;
-	PositionD dragStart = new PositionD(0, 0);
-	PositionD currentOffset = new PositionD(0, 0);
-	PositionD dragOffset = new PositionD(0, 0);
-	PositionD renderOffset = new PositionD(0, 0);
-	PositionD mousePosition = new PositionD(0, 0);
+	Vector2d dragStart = new Vector2d(0, 0);
+	Vector2d currentOffset = new Vector2d(0, 0);
+	Vector2d dragOffset = new Vector2d(0, 0);
+	Vector2d renderOffset = new Vector2d(0, 0);
+	Vector2d mousePosition = new Vector2d(0, 0);
 	double scale = 1.0;
 
-	public ArrayList<Aperture> apertures = new ArrayList<>();
-//	public ArrayList<Line2D> traces = new ArrayList<>();
-	public HashMap<Integer, ArrayList<Shape>> traces = new HashMap<>();
+//	public ArrayList<Aperture> apertures = new ArrayList<>();
+//	public HashMap<Integer, ArrayList<Shape>> traces = new HashMap<>();
+//	public ArrayList<Path2D> pours = new ArrayList<>();
+	
+	public ArrayList<Renderable> objects = new ArrayList<>();
+	
 	double maxX = 0, maxY = 0;
-
-	public class PositionD
+	
+	transient boolean loadedGerber = false;
+	
+	public interface Renderable
 	{
-		double x, y;
-
-		public PositionD(double x, double y)
-		{
-			this.x = x;
-			this.y = y;
-		}
-
-		public PositionD add(PositionD p)
-		{
-			return new PositionD(x + p.x, y + p.y);
-		}
-
-		public PositionD subtract(PositionD p)
-		{
-			return new PositionD(x - p.x, y - p.y);
-		}
-
-		public PositionD multiply(double s)
-		{
-			return new PositionD(x * s, y * s);
-		}
-
-		public void set(PositionD p)
-		{
-			this.x = p.x;
-			this.y = p.y;
-		}
-
-		public void set(double x, double y)
-		{
-			this.x = x;
-			this.y = y;
-		}
-
-		@Override
-		public String toString()
-		{
-			return String.format("[%f, %f]", x, y);
-		}
+		public void render(Graphics2D g);
+		public void setModifiers(Modifiers m);
 	}
 
 	private void updateRenderOffset()
@@ -120,30 +84,22 @@ public class Renderer
 			@Override
 			public void mouseWheelMoved(MouseWheelEvent e)
 			{
-				// log("");
+				mousePosition.x = e.getX();
+				mousePosition.y = e.getY();
 
-				PositionD mousePos = new PositionD(e.getX(), e.getY());
-				// log("Mouse raw: " + mousePos);
-
-				PositionD canvasMousePos = mousePos.subtract(currentOffset);
-				// log("Mouse on canvas: " + canvasMousePos);
-
-				// log("Initial offset: " + currentOffset);
+				Vector2d canvasMousePos = mousePosition.subtract(currentOffset);
 
 				double scaleMultiplier;
 				final double scalePerClick = 1.2;
-				if (e.getPreciseWheelRotation() < 0)
+				if (e.getPreciseWheelRotation() < 0.0)
 					scaleMultiplier = scalePerClick;
 				else
-					scaleMultiplier = 1 / scalePerClick;
+					scaleMultiplier = 1.0 / scalePerClick;
 
 				scale *= scaleMultiplier;
 
-				PositionD newCanvasMousePos = canvasMousePos.multiply(scaleMultiplier);
-				// log("New mouse on canvas: " + newCanvasMousePos);
-
-				currentOffset.set(mousePos.subtract(newCanvasMousePos));
-				// log("New offset: " + currentOffset);
+				Vector2d newCanvasMousePos = canvasMousePos.multiply(scaleMultiplier);
+				mousePosition.subtract(newCanvasMousePos, currentOffset);
 
 				updateRenderOffset();
 			}
@@ -155,12 +111,8 @@ public class Renderer
 			public void mouseReleased(MouseEvent e)
 			{
 				dragging = false;
-
-				currentOffset.set(currentOffset.add(dragOffset));
+				currentOffset.add(dragOffset, currentOffset);
 				dragOffset.set(0, 0);
-
-				// log("Stop drag");
-
 				updateRenderOffset();
 
 			}
@@ -171,8 +123,6 @@ public class Renderer
 				dragging = true;
 				dragStart.x = e.getX();
 				dragStart.y = e.getY();
-
-				// log("Dragging");
 			}
 		});
 
@@ -195,35 +145,35 @@ public class Renderer
 				
 				if (dragging)
 				{
-					PositionD mousePos = new PositionD(e.getX(), e.getY());
-					dragOffset.set(mousePos.subtract(dragStart));
-
-					// log("Offset: " + renderOffset);
-
+					mousePosition.subtract(dragStart, dragOffset);
 					updateRenderOffset();
 				}
 			}
 		});
 	}
 
-	public void redraw()
+	public void finishedLoadingGerber()
 	{
-		maxX = 0;
-		maxY = 0;
-		for (Aperture a : apertures)
-		{
-			if (a.offset.x > maxX)
-				maxX = a.offset.x;
-			if (a.offset.y > maxY)
-				maxY = a.offset.y;
-		}
-		maxX = Utils.toPixels(maxX);
-		maxY = Utils.toPixels(maxY);
-
-		scale = 1.0;
-		currentOffset.set((c.getWidth() - maxX) * 0.5, (maxY - c.getHeight()) * 0.5);
+//		maxX = 0;
+//		maxY = 0;
+//		for (Aperture a : apertures)
+//		{
+//			if (a.offset.x > maxX)
+//				maxX = a.offset.x;
+//			if (a.offset.y > maxY)
+//				maxY = a.offset.y;
+//			
+////			a.area.getBounds2D(); // TODO
+//		}
+//		maxX = Utils.toPixels(maxX);
+//		maxY = Utils.toPixels(maxY);
+//
+//		scale = 1.0;
+//		currentOffset.set((c.getWidth() - maxX) * 0.5, (maxY - c.getHeight()) * 0.5);
 
 		updateRenderOffset();
+		
+		loadedGerber = true;
 	}
 
 	public class GerberCanvas extends JPanel
@@ -256,24 +206,38 @@ public class Renderer
 			// Draw background:
 			g.setColor(Color.BLACK);
 			g.fillRect(0, 0, getWidth(), getHeight());
+			
+			if (!loadedGerber)
+				return;
 
 			graphics2D.translate(renderOffset.x, renderOffset.y);
-			graphics2D.scale(scale, scale);
-//			graphics2D.translate(0, -getHeight());
-
-			for (Aperture a : apertures)
-			{
-				a.render(graphics2D);
-			}
+			graphics2D.scale(scale, -scale);
+			graphics2D.translate(0, -getHeight());
+			
+			g.setColor(Color.WHITE);
+			for (Renderable r : objects)
+				r.render(graphics2D);
 			
 
-			for (Entry<Integer, ArrayList<Shape>> e : traces.entrySet())
-			{
-				graphics2D.setStroke(new BasicStroke((float) Utils.toPixels(e.getKey()), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-				
-				for (Shape l : e.getValue())
-					graphics2D.draw(l);
-			}
+//			for (Aperture a : apertures)
+//			{
+//				a.render(graphics2D);
+//			}
+//			
+//
+//			for (Entry<Integer, ArrayList<Shape>> e : traces.entrySet())
+//			{
+//				graphics2D.setStroke(new BasicStroke((float) Utils.toPixels(e.getKey()), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+//				
+//				for (Shape l : e.getValue())
+//					graphics2D.draw(l);
+//			}
+//			
+//			graphics2D.setStroke(new BasicStroke((float) 1, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+//			for (Path2D p : pours)
+//			{
+//				graphics2D.draw(p); //TODO change to fill when negative pours are achievable
+//			}
 			
 			graphics2D.setTransform(transform);
 			g.setFont(new Font("Consolas", Font.PLAIN, 20));
