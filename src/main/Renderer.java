@@ -20,8 +20,6 @@ import javax.swing.JPanel;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 
-import main.Main.Modifiers;
-
 public class Renderer
 {
 	private JFrame frame;
@@ -35,21 +33,11 @@ public class Renderer
 	Vector2d mousePosition = new Vector2d(0, 0);
 	double scale = 1.0;
 
-//	public ArrayList<Aperture> apertures = new ArrayList<>();
-//	public HashMap<Integer, ArrayList<Shape>> traces = new HashMap<>();
-//	public ArrayList<Path2D> pours = new ArrayList<>();
-	
-	public ArrayList<Renderable> objects = new ArrayList<>();
-	
 	double maxX = 0, maxY = 0;
-	
+
 	transient boolean loadedGerber = false;
-	
-	public interface Renderable
-	{
-		public void render(Graphics2D g);
-		public void setModifiers(Modifiers m);
-	}
+
+	private ArrayList<Layer> layers = new ArrayList<>();
 
 	private void updateRenderOffset()
 	{
@@ -133,16 +121,16 @@ public class Renderer
 			{
 				mousePosition.x = e.getX();
 				mousePosition.y = e.getY();
-				
+
 				c.repaint();
 			}
-			
+
 			@Override
 			public void mouseDragged(MouseEvent e)
 			{
 				mousePosition.x = e.getX();
 				mousePosition.y = e.getY();
-				
+
 				if (dragging)
 				{
 					mousePosition.subtract(dragStart, dragOffset);
@@ -152,27 +140,33 @@ public class Renderer
 		});
 	}
 
+	public void addLayers(Layer... layers)
+	{
+		for (Layer l : layers)
+			this.layers.add(l);
+	}
+
 	public void finishedLoadingGerber()
 	{
-//		maxX = 0;
-//		maxY = 0;
-//		for (Aperture a : apertures)
-//		{
-//			if (a.offset.x > maxX)
-//				maxX = a.offset.x;
-//			if (a.offset.y > maxY)
-//				maxY = a.offset.y;
-//			
-////			a.area.getBounds2D(); // TODO
-//		}
-//		maxX = Utils.toPixels(maxX);
-//		maxY = Utils.toPixels(maxY);
-//
-//		scale = 1.0;
-//		currentOffset.set((c.getWidth() - maxX) * 0.5, (maxY - c.getHeight()) * 0.5);
+		// maxX = 0;
+		// maxY = 0;
+		// for (Aperture a : apertures)
+		// {
+		// if (a.offset.x > maxX)
+		// maxX = a.offset.x;
+		// if (a.offset.y > maxY)
+		// maxY = a.offset.y;
+		//
+		//// a.area.getBounds2D(); // TODO
+		// }
+		// maxX = Utils.toPixels(maxX);
+		// maxY = Utils.toPixels(maxY);
+		//
+		// scale = 1.0;
+		// currentOffset.set((c.getWidth() - maxX) * 0.5, (maxY - c.getHeight()) * 0.5);
 
 		updateRenderOffset();
-		
+
 		loadedGerber = true;
 	}
 
@@ -197,48 +191,30 @@ public class Renderer
 			super.paintComponent(g);
 
 			Graphics2D graphics2D = (Graphics2D) g;
-			
+
 			AffineTransform transform = graphics2D.getTransform();
 
 			graphics2D.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON); // Set anti-alias!
-			// graphics2D.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON); // Set anti-alias for text
+			graphics2D.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON); // Set anti-alias for text
 
 			// Draw background:
 			g.setColor(Color.BLACK);
 			g.fillRect(0, 0, getWidth(), getHeight());
-			
+
 			if (!loadedGerber)
 				return;
 
 			graphics2D.translate(renderOffset.x, renderOffset.y);
 			graphics2D.scale(scale, -scale);
 			graphics2D.translate(0, -getHeight());
-			
-			g.setColor(Color.WHITE);
-			for (Renderable r : objects)
-				r.render(graphics2D);
-			
 
-//			for (Aperture a : apertures)
-//			{
-//				a.render(graphics2D);
-//			}
-//			
-//
-//			for (Entry<Integer, ArrayList<Shape>> e : traces.entrySet())
-//			{
-//				graphics2D.setStroke(new BasicStroke((float) Utils.toPixels(e.getKey()), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-//				
-//				for (Shape l : e.getValue())
-//					graphics2D.draw(l);
-//			}
-//			
-//			graphics2D.setStroke(new BasicStroke((float) 1, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-//			for (Path2D p : pours)
-//			{
-//				graphics2D.draw(p); //TODO change to fill when negative pours are achievable
-//			}
-			
+			g.setColor(Color.WHITE);
+			for (Layer l : layers)
+			{
+				for (Renderable r : l.objects)
+					r.render(graphics2D);
+			}
+
 			graphics2D.setTransform(transform);
 			g.setFont(new Font("Consolas", Font.PLAIN, 20));
 			g.setColor(Color.WHITE);

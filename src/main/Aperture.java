@@ -5,8 +5,7 @@ import java.awt.Graphics2D;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Area;
 
-import main.Main.Modifiers;
-import main.Renderer.Renderable;
+import main.Layer.Modifiers;
 
 public class Aperture implements Renderable
 {
