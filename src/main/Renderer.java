@@ -267,9 +267,6 @@ public class Renderer
 
 	public void addLayers(Layer... layers)
 	{
-		int width = 10000;
-		int height = 10000;
-
 		pbar.setMaximum(100);
 
 		double minX = Double.MAX_VALUE;
@@ -292,137 +289,87 @@ public class Renderer
 				maxY = layerBounds.getMaxY();
 			Utils.log(String.format("Bounds calc time: %.3fs", (Timer.toc() * 0.001)));
 		}
-		width = (int) (maxX - minX) + Config.exportBorderSize * 2;
-		height = (int) (maxY - minY) + Config.exportBorderSize * 2;
-		// scale = 1.0;
-		// currentOffset.set((c.getWidth() - maxX) * 0.5, (maxY - c.getHeight()) * 0.5);
+		int width = (int) (maxX - minX) + Config.exportBorderSize * 2 + 1; // +1 provides additional pixel for anti-aliasing to flow into
+		int height = (int) (maxY - minY) + Config.exportBorderSize * 2 + 1;
 
+		Object dstData;
+		int color, shift;
 		if (Config.use16BitColor)
 		{
 			everything = new BufferedImage(width, height, BufferedImage.TYPE_USHORT_555_RGB);
-			short[] dstData = new short[width * height];
-			short color = 0x1F;
-			short shift = -3;
-			for (int layerIndex = 0; layerIndex < layers.length; layerIndex++)
-			{
-				Layer l = layers[layerIndex];
-
-				Timer.tic();
-
-				BufferedImage bufferedImage = new BufferedImage(width, height, BufferedImage.TYPE_BYTE_GRAY);
-
-				Graphics2D layerG2D = (Graphics2D) bufferedImage.getGraphics();
-
-				layerG2D.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-				// Flip
-				layerG2D.translate(0, height);
-				layerG2D.scale(1, -1);
-
-				layerG2D.translate(-minX - Config.exportBorderSize, -minY);
-
-				layerG2D.setColor(Color.WHITE);
-				for (Renderable r : l.objects)
-				{
-					r.render(layerG2D);
-				}
-
-				byte[] src = ((DataBufferByte) bufferedImage.getData().getDataBuffer()).getData();
-
-				for (int pixelIndex = 0; pixelIndex < width * height; pixelIndex++)
-				{
-					if (shift < 0)
-						dstData[pixelIndex] |= (src[pixelIndex] >> -shift) & color;
-					else
-						dstData[pixelIndex] |= (src[pixelIndex] << shift) & color;
-				}
-
-				color <<= 5;
-				shift += 5;
-
-				Utils.log(String.format("Layer render time: %.2fs", (Timer.toc() * 0.001)));
-
-				pbar.setValue(100 * (layerIndex + 1) / (layers.length + 1));
-			}
-			everything.getRaster().setDataElements(0, 0, width, height, dstData);
+			dstData = new short[width * height];
+			color = 0x1F;
+			shift = -3;
 		}
 		else
 		{
 			everything = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-			int[] dstData = new int[width * height];
-			int color = 0xFF;
-			int shift = 0;
-			for (int layerIndex = 0; layerIndex < layers.length; layerIndex++)
+			dstData = new int[width * height];
+			color = 0xFF;
+			shift = 0;
+		}
+		
+		for (int layerIndex = 0; layerIndex < layers.length; layerIndex++)
+		{
+			Layer l = layers[layerIndex];
+
+			Timer.tic();
+
+			BufferedImage bufferedImage = new BufferedImage(width, height, BufferedImage.TYPE_BYTE_GRAY);
+			Graphics2D layerG2D = (Graphics2D) bufferedImage.getGraphics();
+			layerG2D.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+			// Flip:
+			layerG2D.translate(0, height);
+			layerG2D.scale(1, -1);
+
+			// Compensate for layer origin:
+			layerG2D.translate(-minX + Config.exportBorderSize, -minY + Config.exportBorderSize);
+
+			layerG2D.setColor(Color.WHITE);
+			for (Renderable r : l.objects)
+				r.render(layerG2D);
+			
+//			 if (layerIndex == 0)
+//				 bufferedImage = Utils.blur(bufferedImage, 3);
+//			 else if (layerIndex == 2)
+//				 bufferedImage = Utils.blur(bufferedImage, 5);
+
+			// Composite onto existing image:
+			byte[] src = ((DataBufferByte) bufferedImage.getData().getDataBuffer()).getData();
+			if (Config.use16BitColor)
 			{
-				Layer l = layers[layerIndex];
-
-				Timer.tic();
-
-				BufferedImage bufferedImage = new BufferedImage(width, height, BufferedImage.TYPE_BYTE_GRAY);
-
-				Graphics2D layerG2D = (Graphics2D) bufferedImage.getGraphics();
-
-				layerG2D.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-				// Flip
-				layerG2D.translate(0, height);
-				layerG2D.scale(1, -1);
-
-				layerG2D.translate(-minX + Config.exportBorderSize, -minY + Config.exportBorderSize);
-
-				layerG2D.setColor(Color.WHITE);
-				for (Renderable r : l.objects)
-				{
-					r.render(layerG2D);
-				}
-
-				byte[] src = ((DataBufferByte) bufferedImage.getData().getDataBuffer()).getData();
-
 				for (int pixelIndex = 0; pixelIndex < width * height; pixelIndex++)
-					dstData[pixelIndex] |= (src[pixelIndex] << shift) & color;
-
+				{
+					if (shift < 0)
+						((short[]) dstData)[pixelIndex] |= (src[pixelIndex] >> -shift) & color;
+					else
+						((short[]) dstData)[pixelIndex] |= (src[pixelIndex] << shift) & color;
+				}
+				color <<= 5;
+				shift += 5;
+			}
+			else
+			{
+				for (int pixelIndex = 0; pixelIndex < width * height; pixelIndex++)
+					((int[]) dstData)[pixelIndex] |= (src[pixelIndex] << shift) & color;
 				color <<= 8;
 				shift += 8;
-
-				Utils.log(String.format("Layer render time: %.2fs", (Timer.toc() * 0.001)));
-
-				pbar.setValue(100 * (layerIndex + 1) / (layers.length + 1));
 			}
-			everything.getRaster().setDataElements(0, 0, width, height, dstData);
-		}
 
-		// if (layerIndex == 0)
-		// {
-		// int blurRadius = 3;
-		//
-		// float[] matrix = new float[blurRadius * blurRadius];
-		// for (int i = 0; i < blurRadius * blurRadius; i++)
-		// matrix[i] = 1.0f/(blurRadius * blurRadius);
-		//
-		// Kernel kernel = new Kernel(blurRadius, blurRadius, matrix);
-		// BufferedImageOp op = new ConvolveOp(kernel);
-		// bufferedImage = op.filter(bufferedImage, null);
-		// }
-		// else if (layerIndex == 2)
-		// {
-		// int blurRadius = 5;
-		//
-		// float[] matrix = new float[blurRadius * blurRadius];
-		// for (int i = 0; i < blurRadius * blurRadius; i++)
-		// matrix[i] = 1.0f/(blurRadius * blurRadius);
-		//
-		// Kernel kernel = new Kernel(blurRadius, blurRadius, matrix);
-		// BufferedImageOp op = new ConvolveOp(kernel);
-		// bufferedImage = op.filter(bufferedImage, null);
-		// }
+			Utils.log(String.format("Layer render time: %.2fs", (Timer.toc() * 0.001)));
+			pbar.setValue(100 * (layerIndex + 1) / (layers.length + 1));
+		}
+		everything.getRaster().setDataElements(0, 0, width, height, dstData);
 
 		Utils.log(String.format("Bounds: x: %f, y: %f, X: %f, Y: %f", minX, minY, maxX, maxY));
 		bounds = new Rectangle2D.Double(minX, minY, maxX - minX, maxY - minY);
 
-		scale = c.getHeight() / ((double) height + 200); // TODO consider width if wider than height
+		if (height < width)
+			scale = c.getHeight() / ((double) height + 200);
+		else
+			scale = c.getWidth() / ((double) width + 200);
 		currentOffset.set((c.getWidth() - width * scale) * 0.5, (c.getHeight() - height * scale) * 0.5);
-
-		// Utils.log("Composite time: " + (Timer.toc() * 0.001));
 
 		pbar.setValue(100);
 

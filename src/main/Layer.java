@@ -48,7 +48,7 @@ public class Layer
 	private Aperture selectedAperture = null;
 	private ArrayList<Shape> currentRegion = null;
 	private boolean inRegion = false;
-	private InterpolationMode interpolationMode = InterpolationMode.NONE;
+	private InterpolationMode interpolationMode = InterpolationMode.LINEAR; // FIXME some gerber files seem to assume this is the default?
 	private Modifiers globalModifiers = new Modifiers();
 	private UnitType units = UnitType.NONE;
 	private int gerberUnitsToNanosMultiplier;
@@ -820,7 +820,6 @@ public class Layer
 			{
 				case "D01": // Interpolate
 				{
-
 					if (interpolationMode == InterpolationMode.NONE)
 						throw new RuntimeException("Interpolation requested but interpolation mode not set.");
 
@@ -1025,7 +1024,7 @@ public class Layer
 		}
 		else if (commandWord.startsWith("OF")) // Image offset
 		{
-			// Ignore
+			warn("Deprecated command OF used. This is being ignored, but may cause layer misalignment.");
 		}
 		else if (commandWord.startsWith("SF")) // Scale factor
 		{

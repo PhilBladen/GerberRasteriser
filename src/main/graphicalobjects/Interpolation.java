@@ -58,7 +58,9 @@ public class Interpolation implements Renderable
 	@Override
 	public Rectangle2D getBounds()
 	{
-		return s.getBounds2D();
+		Rectangle2D bounds = s.getBounds2D();
+		double thickness_pixels = Utils.toPixels(thickness);
+		return new Rectangle2D.Double(bounds.getX() - thickness_pixels * 0.5, bounds.getY() - thickness_pixels * 0.5, bounds.getWidth() + thickness_pixels, bounds.getHeight() + thickness_pixels);
 	}
 	
 	public int getThickness()

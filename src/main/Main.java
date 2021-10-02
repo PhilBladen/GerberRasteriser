@@ -4,12 +4,37 @@ import static main.Utils.log;
 
 import java.io.File;
 
+import javax.swing.JFileChooser;
+
 public class Main
 {
 	private final String APP_NAME = "Gerber Rasteriser";
-	private final String APP_VERSION = "v0.1";
+	private final String APP_VERSION = "v0.2";
 
 	private Renderer renderer;
+	
+	private File previousPath = null;
+	
+	private Layer loadLayer()
+	{
+		JFileChooser j = new JFileChooser();
+		j.setDialogType(JFileChooser.OPEN_DIALOG);
+		j.setDialogTitle("Open copper (blue) gerber file");
+		j.setCurrentDirectory(previousPath);
+		if (j.showOpenDialog(null) != JFileChooser.APPROVE_OPTION)
+			return null;
+		
+		previousPath=  j.getSelectedFile().getParentFile();
+		
+		File file = j.getSelectedFile();
+		if (file != null && file.exists())
+		{
+			Layer layer = new Layer(file);
+			return layer;
+		}
+		
+		return null;
+	}
 
 	public Main()
 	{
@@ -18,27 +43,10 @@ public class Main
 		renderer = new Renderer();
 		renderer.createWindow();
 		
-		Layer copper = new Layer(new File("Reference files/STAR-XL CCT.GTL"));
-		Layer silk = new Layer(new File("Reference files/STAR-XL CCT.GTO"));
-		Layer solderResist = new Layer(new File("Reference files/STAR-XL CCT.GTS"));
+		Layer copper = loadLayer();
+		Layer solderResist = loadLayer();
+		Layer silk = loadLayer();
 		renderer.addLayers(copper, solderResist, silk);
-//		renderer.addLayers(copper, copper, copper);
-		
-//		Layer copper = new Layer(new File("Reference files/STAR-XL CCT.GBL"));
-//		Layer silk = new Layer(new File("Reference files/STAR-XL CCT.GBO"));
-//		Layer solderResist = new Layer(new File("Reference files/STAR-XL CCT.GBS"));
-//		Layer tcopper = new Layer(new File("Reference files/STAR-XL CCT.GTL"));
-//		Layer tsilk = new Layer(new File("Reference files/STAR-XL CCT.GTO"));
-//		Layer tsolderResist = new Layer(new File("Reference files/STAR-XL CCT.GTS"));
-//		renderer.addLayers(tcopper, tsilk, tsolderResist, copper, silk, solderResist);
-		
-//		Layer copper = new Layer(new File("Reference files/GerberTest/GerberFiles/copper_top.gbr"));
-//		Layer silk = new Layer(new File("Reference files/GerberTest/GerberFiles/silkscreen_top.gbr"));
-//		Layer solderResist = new Layer(new File("Reference files/GerberTest/GerberFiles/soldermask_top.gbr"));
-//		renderer.addLayers(copper, silk, solderResist);
-
-		
-		//		Layer copper2 = new Layer(new File("E:/PJB/Programming/Java/Workspace/GerberRasteriser/Reference files/GerberTest/GerberFiles/copper_top.gbr"));
 	}
 	
 	public static void main(String[] args)
