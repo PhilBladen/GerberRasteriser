@@ -14,14 +14,8 @@ public class Config
 			config = new Config();
 		return config;
 	}
-	
-	enum UnitType
-	{
-		NONE, MM, IN;
-	}
 
-	UnitType units = UnitType.NONE;
-	int multiplier;
-	final double rasterDPI = 2540;
-	final double nanosToPixels = (rasterDPI / 25.4) * 1E-6;
+	final public double rasterDPI = 2540;
+	final public double nanosToPixels = (rasterDPI / 25.4) * 1E-6;
+	final public boolean use16BitColor = true; // Improves memory usage but can significantly slow renderering in certain machines
 }

@@ -25,7 +25,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import main.Aperture.Custom;
-import main.Config.UnitType;
 import main.Layer.Modifiers.Mirroring;
 import main.Layer.Modifiers.Polarity;
 import main.Utils.Timer;
@@ -50,8 +49,39 @@ public class Layer
 	private boolean inRegion = false;
 	private InterpolationMode interpolationMode = InterpolationMode.NONE;
 	private Modifiers globalModifiers = new Modifiers();
+	private UnitType units = UnitType.NONE;
+	private int gerberUnitsToNanosMultiplier;
 
 	public ArrayList<Renderable> objects = new ArrayList<>();
+	
+	private enum UnitType
+	{
+		NONE, MM, IN;
+	}
+	
+	private double convertUnits(double in)
+	{
+		if (units == UnitType.NONE)
+			throw new RuntimeException("Configuration not complete.");
+		
+		if (units == UnitType.IN)
+			in *= 25.4;
+		
+		return in * 1E6;
+	}
+	
+	private int importCoordinate(double in)
+	{
+		if (units == UnitType.NONE)
+			throw new RuntimeException("Configuration not complete.");
+		
+		if (units == UnitType.IN)
+		{
+			in *= 25.4;
+		}
+		
+		return (int) (in * gerberUnitsToNanosMultiplier);
+	}
 
 	public Layer(File file)
 	{
@@ -241,14 +271,14 @@ public class Layer
 	{
 		log("Units mm selected.");
 
-		Config.getConfig().units = UnitType.MM;
+		units = UnitType.MM;
 	}
 
 	private void setUnitsIN()
 	{
 		log("Units inches selected.");
 
-		Config.getConfig().units = UnitType.IN;
+		units = UnitType.IN;
 	}
 	
 	public Rectangle2D calculateBounds() // TODO include line stroke width
@@ -302,9 +332,9 @@ public class Layer
 					if (parts.length != 5 && parts.length != 6)
 						throw new RuntimeException();
 
-					double diameter = Utils.convertUnits(Double.parseDouble(parts[2]));
-					double centerX = Utils.convertUnits(Double.parseDouble(parts[3]));
-					double centerY = Utils.convertUnits(Double.parseDouble(parts[4]));
+					double diameter = convertUnits(Double.parseDouble(parts[2]));
+					double centerX = convertUnits(Double.parseDouble(parts[3]));
+					double centerY = convertUnits(Double.parseDouble(parts[4]));
 					double rotation;
 					if (parts.length == 5)
 						rotation = 0;
@@ -323,11 +353,11 @@ public class Layer
 					if (parts.length != 8)
 						throw new RuntimeException();
 
-					double width = Utils.convertUnits(Double.parseDouble(parts[2]));
-					double startX = Utils.convertUnits(Double.parseDouble(parts[3]));
-					double startY = Utils.convertUnits(Double.parseDouble(parts[4]));
-					double endX = Utils.convertUnits(Double.parseDouble(parts[5]));
-					double endY = Utils.convertUnits(Double.parseDouble(parts[6]));
+					double width = convertUnits(Double.parseDouble(parts[2]));
+					double startX = convertUnits(Double.parseDouble(parts[3]));
+					double startY = convertUnits(Double.parseDouble(parts[4]));
+					double endX = convertUnits(Double.parseDouble(parts[5]));
+					double endY = convertUnits(Double.parseDouble(parts[6]));
 					double rotation = Utils.toRads(Double.parseDouble(parts[7]));
 
 					m.rotate(rotation);
@@ -343,10 +373,10 @@ public class Layer
 					if (parts.length != 7)
 						throw new RuntimeException();
 
-					double width = Utils.convertUnits(Double.parseDouble(parts[2]));
-					double height = Utils.convertUnits(Double.parseDouble(parts[3]));
-					double centerX = Utils.convertUnits(Double.parseDouble(parts[4]));
-					double centerY = Utils.convertUnits(Double.parseDouble(parts[5]));
+					double width = convertUnits(Double.parseDouble(parts[2]));
+					double height = convertUnits(Double.parseDouble(parts[3]));
+					double centerX = convertUnits(Double.parseDouble(parts[4]));
+					double centerY = convertUnits(Double.parseDouble(parts[5]));
 					double rotation = Utils.toRads(Double.parseDouble(parts[6]));
 
 					m.rotate(rotation);
@@ -369,8 +399,8 @@ public class Layer
 					ArrayList<Vector2i> coordinates = new ArrayList<>();
 					for (int i = 0; i < numVertices; i++)
 					{
-						double x = Utils.convertUnits(Double.parseDouble(parts[3 + 2 * i]));
-						double y = Utils.convertUnits(Double.parseDouble(parts[4 + 2 * i]));
+						double x = convertUnits(Double.parseDouble(parts[3 + 2 * i]));
+						double y = convertUnits(Double.parseDouble(parts[4 + 2 * i]));
 
 						coordinates.add(m.transform(new Vector2i(x, y)));
 					}
@@ -385,9 +415,9 @@ public class Layer
 						throw new RuntimeException();
 
 					int numVertices = Integer.parseInt(parts[2]);
-					double centerX = Utils.convertUnits(Double.parseDouble(parts[3]));
-					double centerY = Utils.convertUnits(Double.parseDouble(parts[4]));
-					double diameter = Utils.convertUnits(Double.parseDouble(parts[5]));
+					double centerX = convertUnits(Double.parseDouble(parts[3]));
+					double centerY = convertUnits(Double.parseDouble(parts[4]));
+					double diameter = convertUnits(Double.parseDouble(parts[5]));
 					double rotation = Utils.toRads(Double.parseDouble(parts[6]));
 
 					m.rotate(rotation);
@@ -402,11 +432,11 @@ public class Layer
 					if (parts.length != 7)
 						throw new RuntimeException();
 
-					double centerX = Utils.convertUnits(Double.parseDouble(parts[1]));
-					double centerY = Utils.convertUnits(Double.parseDouble(parts[2]));
-					double outerDiameter = Utils.convertUnits(Double.parseDouble(parts[3]));
-					double innerDiameter = Utils.convertUnits(Double.parseDouble(parts[4]));
-					double gapThickness = Utils.convertUnits(Double.parseDouble(parts[5]));
+					double centerX = convertUnits(Double.parseDouble(parts[1]));
+					double centerY = convertUnits(Double.parseDouble(parts[2]));
+					double outerDiameter = convertUnits(Double.parseDouble(parts[3]));
+					double innerDiameter = convertUnits(Double.parseDouble(parts[4]));
+					double gapThickness = convertUnits(Double.parseDouble(parts[5]));
 					double rotation = Utils.toRads(Double.parseDouble(parts[6]));
 
 					m.rotate(rotation);
@@ -480,7 +510,7 @@ public class Layer
 			if ((xInteger != yInteger) || (xDecimal != yDecimal))
 				throw new RuntimeException("Unsupported format specification: mismatching x and y format.");
 
-			Config.getConfig().multiplier = (int) Math.pow(10, 6 - xDecimal);
+			gerberUnitsToNanosMultiplier = (int) Math.pow(10, 6 - xDecimal);
 
 			log(String.format("Set format X%d.%d Y%d.%d", xInteger, xDecimal, yInteger, yDecimal));
 		}
@@ -500,7 +530,7 @@ public class Layer
 			{
 				String group = m.group(i + 3);
 				args[i] = Double.parseDouble(group);
-				argsconv[i] = (int) Utils.convertUnits(args[i]);
+				argsconv[i] = (int) convertUnits(args[i]);
 			}
 
 			Aperture aperture = null;
@@ -831,7 +861,7 @@ public class Layer
 				if (group == null)
 					args[i] = null;
 				else
-					args[i] = Utils.importCoordinate(Integer.parseInt(group));
+					args[i] = importCoordinate(Integer.parseInt(group));
 			}
 
 			String operation = m.group(5);
