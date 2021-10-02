@@ -21,8 +21,15 @@ public class Main
 		Layer copper = new Layer(new File("Reference files/STAR-XL CCT.GTL"));
 		Layer silk = new Layer(new File("Reference files/STAR-XL CCT.GTO"));
 		Layer solderResist = new Layer(new File("Reference files/STAR-XL CCT.GTS"));
-		renderer.addLayers(copper, silk, solderResist);
-//		renderer.addLayers(silk);
+		renderer.addLayers(copper, solderResist, silk);
+		
+//		Layer copper = new Layer(new File("Reference files/STAR-XL CCT.GBL"));
+//		Layer silk = new Layer(new File("Reference files/STAR-XL CCT.GBO"));
+//		Layer solderResist = new Layer(new File("Reference files/STAR-XL CCT.GBS"));
+//		Layer tcopper = new Layer(new File("Reference files/STAR-XL CCT.GTL"));
+//		Layer tsilk = new Layer(new File("Reference files/STAR-XL CCT.GTO"));
+//		Layer tsolderResist = new Layer(new File("Reference files/STAR-XL CCT.GTS"));
+//		renderer.addLayers(tcopper, tsilk, tsolderResist, copper, silk, solderResist);
 		
 //		Layer copper = new Layer(new File("Reference files/GerberTest/GerberFiles/copper_top.gbr"));
 //		Layer silk = new Layer(new File("Reference files/GerberTest/GerberFiles/silkscreen_top.gbr"));

@@ -14,6 +14,7 @@ import java.awt.geom.Arc2D;
 import java.awt.geom.Area;
 import java.awt.geom.Line2D;
 import java.awt.geom.Path2D;
+import java.awt.geom.Rectangle2D;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -138,6 +139,12 @@ public class Layer
 		{
 			modifiers = m;
 		}
+
+		@Override
+		public Rectangle2D getBounds()
+		{
+			return s.getBounds2D();
+		}
 	}
 
 	public class Region implements Renderable
@@ -171,6 +178,12 @@ public class Layer
 		public void setModifiers(Modifiers m)
 		{
 			modifiers = m;
+		}
+
+		@Override
+		public Rectangle2D getBounds()
+		{
+			return p.getBounds2D();
 		}
 	}
 
@@ -236,6 +249,28 @@ public class Layer
 		log("Units inches selected.");
 
 		Config.getConfig().units = UnitType.IN;
+	}
+	
+	public Rectangle2D calculateBounds() // TODO include line stroke width
+	{
+		double minX = Double.MAX_VALUE;
+		double minY = Double.MAX_VALUE;
+		double maxX = Double.MIN_VALUE;
+		double maxY = Double.MIN_VALUE;
+		for (Renderable r : objects)
+		{
+			Rectangle2D localBounds = r.getBounds();
+			if (localBounds.getMinX() < minX)
+				minX = localBounds.getMinX();
+			if (localBounds.getMinY() < minY)
+				minY = localBounds.getMinY();
+			if (localBounds.getMaxX() > maxX)
+				maxX = localBounds.getMaxX();
+			if (localBounds.getMaxY() > maxY)
+				maxY = localBounds.getMaxY();
+		}
+		Utils.log(String.format("Bounds: x: %f, y: %f, X: %f, Y: %f", minX, minY, maxX, maxY));
+		return new Rectangle2D.Double(minX, minY, maxX - minX, maxY - minY);
 	}
 
 	private void addApertureTemplate(ExtendedCommand cmd, String ID)

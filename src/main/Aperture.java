@@ -1,9 +1,11 @@
 package main;
 
+import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Area;
+import java.awt.geom.Rectangle2D;
 
 import main.Layer.Modifiers;
 
@@ -48,6 +50,10 @@ public class Aperture implements Renderable
 		g.setColor(Color.WHITE);
 		g.fill(area);
 		
+//		g.setColor(Color.ORANGE);
+//		g.setStroke(new BasicStroke(1));
+//		g.draw(area.getBounds());
+		
 		popTransform(g);
 	}
 
@@ -55,6 +61,12 @@ public class Aperture implements Renderable
 	public void setModifiers(Modifiers m)
 	{
 		modifiers = m;
+	}
+	
+	@Override
+	public Rectangle2D getBounds()
+	{
+		return area.getBounds2D();
 	}
 	
 	public static class Circle extends Aperture

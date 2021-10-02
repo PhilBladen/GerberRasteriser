@@ -22,6 +22,6 @@ public class Config
 
 	UnitType units = UnitType.NONE;
 	int multiplier;
-	double nanosToPixels = 1E-4 * 1.0;
-//	double nanosToPixels = 1E-4;
+	final double rasterDPI = 2540;
+	final double nanosToPixels = (rasterDPI / 25.4) * 1E-6;
 }

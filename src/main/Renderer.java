@@ -2,34 +2,32 @@ package main;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Composite;
-import java.awt.CompositeContext;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.Image;
 import java.awt.RenderingHints;
-import java.awt.Toolkit;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
 import java.awt.geom.AffineTransform;
+import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
-import java.awt.image.ColorModel;
 import java.awt.image.DataBufferByte;
-import java.awt.image.DataBufferInt;
-import java.awt.image.MemoryImageSource;
-import java.awt.image.Raster;
-import java.awt.image.WritableRaster;
+import java.awt.image.DataBufferUShort;
 import java.util.ArrayList;
 
 import javax.swing.JFrame;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JProgressBar;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
+import javax.swing.border.EmptyBorder;
 
 import main.Utils.Timer;
 
@@ -37,6 +35,7 @@ public class Renderer
 {
 	private JFrame frame;
 	private GerberCanvas c;
+	private JProgressBar pbar;
 
 	boolean dragging = false;
 	Vector2d dragStart = new Vector2d(0, 0);
@@ -55,6 +54,12 @@ public class Renderer
 	private void updateRenderOffset()
 	{
 		renderOffset.set(currentOffset.add(dragOffset));
+		
+//		if (renderOffset.x < 0)
+//			renderOffset.x = 0;
+//
+//		if (renderOffset.y < 0)
+//			renderOffset.y = 0;
 
 		c.repaint();
 	}
@@ -70,11 +75,21 @@ public class Renderer
 		}
 
 		c = new GerberCanvas();
+		
+		JPanel bottom = new JPanel();
+		BorderLayout l;
+		bottom.setLayout(l = new BorderLayout());
+		l.setHgap(10);
+		bottom.setBorder(new EmptyBorder(0, 0, 0, 10));
+		bottom.add(pbar = new JProgressBar(), BorderLayout.CENTER);
+		JLabel label;
+		bottom.add(label = new JLabel("Loading gerbers..."), BorderLayout.EAST);
 
 		frame = new JFrame("Gerber Rasteriser");
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frame.setLayout(new BorderLayout());
-		frame.add(c);
+		frame.add(c, BorderLayout.CENTER);
+		frame.add(bottom, BorderLayout.SOUTH);
 		frame.pack();
 		frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
 		frame.setLocationRelativeTo(null);
@@ -88,7 +103,7 @@ public class Renderer
 				mousePosition.x = e.getX();
 				mousePosition.y = e.getY();
 
-				Vector2d canvasMousePos = mousePosition.subtract(currentOffset);
+				Vector2d canvasMousePos = mousePosition.subtract(currentOffset).multiply(1.0 / scale);
 
 				double scaleMultiplier;
 				final double scalePerClick = 1.2;
@@ -98,11 +113,34 @@ public class Renderer
 					scaleMultiplier = 1.0 / scalePerClick;
 
 				scale *= scaleMultiplier;
+				
+				if (scale > 10)
+					scale = 10;
+				if (scale < 0.1)
+					scale = 0.1;
 
-				Vector2d newCanvasMousePos = canvasMousePos.multiply(scaleMultiplier);
+				Vector2d newCanvasMousePos = canvasMousePos.multiply(scale);
 				mousePosition.subtract(newCanvasMousePos, currentOffset);
 
 				updateRenderOffset();
+			}
+		});
+
+		frame.addKeyListener(new KeyListener()
+		{
+			@Override
+			public void keyTyped(KeyEvent e)
+			{
+			}
+
+			@Override
+			public void keyReleased(KeyEvent e)
+			{
+			}
+
+			@Override
+			public void keyPressed(KeyEvent e)
+			{
 			}
 		});
 
@@ -154,103 +192,8 @@ public class Renderer
 	}
 
 	BufferedImage everything;
+	Rectangle2D bounds;
 
-	public class AdditiveComposite implements Composite
-	{
-		public AdditiveComposite()
-		{
-			super();
-		}
-
-		public CompositeContext createContext(ColorModel srcColorModel, ColorModel dstColorModel, RenderingHints hints)
-		{
-			return new AdditiveCompositeContext();
-		}
-	}
-	
-	public int fun = 0;
-
-	public class AdditiveCompositeContext implements CompositeContext
-	{
-		public AdditiveCompositeContext()
-		{
-		};
-
-		public void compose(Raster src, Raster dstIn, WritableRaster dstOut)
-		{
-			int w1 = src.getWidth();
-			int h1 = src.getHeight();
-			int chan1 = src.getNumBands();
-			int w2 = dstIn.getWidth();
-			int h2 = dstIn.getHeight();
-			int chan2 = dstIn.getNumBands();
-
-			int minw = Math.min(w1, w2);
-			int minh = Math.min(h1, h2);
-			int minCh = Math.min(chan1, chan2);
-
-			// This bit is horribly inefficient,
-			// getting individual pixels rather than all at once.
-			
-			byte[] srcData = new byte[w1 * h1];
-			src.getDataElements(0, 0, w1, h1, srcData);
-			
-			
-			int[] dstData = new int[w1 * h1];
-
-			
-			for (int x = 0; x < dstIn.getWidth(); x++)
-			{
-				for (int y = 0; y < dstIn.getHeight(); y++)
-				{
-					if (srcData[y * w1 + x] != 0)
-						dstData[y * w1 + x] = 0x00FFFFFF;
-					
-//					float[] pxSrc = null;
-//					pxSrc = src.getPixel(x, y, pxSrc);
-//					float[] pxDst = null;
-//					pxDst = dstIn.getPixel(x, y, pxDst);
-//
-//					float alpha = 255;
-//					if (pxSrc.length > 3)
-//					{
-//						alpha = pxSrc[3];
-//					}
-//					
-////					if (fun == 0)
-////					{
-////						pxSrc[1] = 0;
-////						pxSrc[2] = 0;
-////					}
-////					else if (fun == 1)
-////					{
-////						pxSrc[0] = 0;
-////						pxSrc[2] = 0;
-////					}
-////					else
-////					{
-////						pxSrc[0] = 0;
-////						pxSrc[1] = 0;
-////					}
-////					
-//
-//					for (int i = 0; i < 3 && i < minCh; i++)
-//					{
-//						pxDst[i] = Math.min(255, (pxSrc[i] * (alpha / 255)) + (pxDst[i]));
-//						dstOut.setPixel(x, y, pxDst);
-//					}
-				}
-			}
-			
-
-			dstOut.setDataElements(0, 0, w1, h1, dstData);
-		}
-
-		public void dispose()
-		{
-		}
-	}
-	
 	int numRunningThreads = 0;
 	Object lock = new Object();
 
@@ -259,125 +202,124 @@ public class Renderer
 		for (Layer l : layers)
 			this.layers.add(l);
 
-		ArrayList<BufferedImage> layerImages = new ArrayList<>();
-		
-//		int size = 42000;
-		int size = 10000;
+		int width = 10000;
+		int height = 10000;
 
-		for (Layer l : layers)
+		pbar.setMaximum(100);
+		
+		double minX = Double.MAX_VALUE;
+		double minY = Double.MAX_VALUE;
+		double maxX = Double.MIN_VALUE;
+		double maxY = Double.MIN_VALUE;
+		for (int layerIndex = 0; layerIndex < layers.length; layerIndex++)
 		{
-			Timer.tic();
+			Layer l = layers[layerIndex];
 			
-			BufferedImage bufferedImage = new BufferedImage(size, size, BufferedImage.TYPE_BYTE_GRAY);
-			layerImages.add(bufferedImage);
+			Timer.tic();
+			Rectangle2D layerBounds = l.calculateBounds();
+			if (layerBounds.getMinX() < minX)
+				minX = layerBounds.getMinX();
+			if (layerBounds.getMinY() < minY)
+				minY = layerBounds.getMinY();
+			if (layerBounds.getMaxX() > maxX)
+				maxX = layerBounds.getMaxX();
+			if (layerBounds.getMaxY() > maxY)
+				maxY = layerBounds.getMaxY();
+			Utils.log(String.format("Bounds calc time: %.3fs", (Timer.toc() * 0.001)));
+		}
+		width = (int) (maxX - minX);
+		height = (int) (maxY - minY);
+		
+		everything = new BufferedImage(width, height, BufferedImage.TYPE_USHORT_555_RGB);
+		short[] dstData = ((DataBufferUShort) everything.getData().getDataBuffer()).getData();
+
+		short color = 0x1F;
+		short shift = -3;
+		
+		for (int layerIndex = 0; layerIndex < layers.length; layerIndex++)
+		{
+			Layer l = layers[layerIndex];
+
+			Timer.tic();
+
+			BufferedImage bufferedImage = new BufferedImage(width, height, BufferedImage.TYPE_BYTE_GRAY);
 
 			Graphics2D layerG2D = (Graphics2D) bufferedImage.getGraphics();
-			
+
 			layerG2D.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-			
+
 			// Flip
-			layerG2D.translate(0, size);
+			layerG2D.translate(0, height);
 			layerG2D.scale(1, -1);
 
 			layerG2D.setColor(Color.WHITE);
 			for (Renderable r : l.objects)
+			{
 				r.render(layerG2D);
-			
-			Utils.log("Layer render time: " + (Timer.toc() * 0.001));
-		}
-		
-		everything = new BufferedImage(size, size, BufferedImage.TYPE_INT_RGB);		
-		
-		Raster l1 = layerImages.get(0).getData();
-		Raster l2 = layerImages.get(1).getData();
-		Raster l3 = layerImages.get(2).getData();
-				
-		byte[] srcData1 = ((DataBufferByte) l1.getDataBuffer()).getData();
-		byte[] srcData2 = ((DataBufferByte) l2.getDataBuffer()).getData();
-		byte[] srcData3 = ((DataBufferByte) l3.getDataBuffer()).getData();
-		
-		int[] dstData = ((DataBufferInt) everything.getData().getDataBuffer()).getData();
-		
-		int numCores = 4;
-		
-		final int parallelHeight = size / numCores;
-		
-		Timer.tic();
-				
-		for (int threadIndex = 0; threadIndex < numCores; threadIndex++)
-		{
-			final int actualThreadIndex = threadIndex;
-			
-			numRunningThreads++;
-			
-			new Thread(new Runnable()
-			{
-				@Override
-				public void run()
-				{
-//					int startRow = actualThreadIndex * parallelHeight;
-//					int endRow = (actualThreadIndex + 1) * parallelHeight;
-//					
-//					for (int rowIndex = startRow; rowIndex < endRow; rowIndex++)
-//					{
-//						if (rowIndex % 250 == 0)
-//							Utils.log(rowIndex);
-//						
-//						byte[] srcData1 = new byte[size];
-//						l1.getDataElements(0, rowIndex, size, 1, srcData1);
-//						
-//						byte[] srcData2 = new byte[size * size];
-//						l2.getDataElements(0, rowIndex, size, 1, srcData2);
-//						
-//						byte[] srcData3 = new byte[size * size];
-//						l3.getDataElements(0, rowIndex, size, 1, srcData3);
-//						
-//						int[] dstData = new int[size];
-//						
-//						for (int pixelIndex = 0; pixelIndex < size; pixelIndex++)
-//						{
-//							dstData[pixelIndex] |= srcData1[pixelIndex] & 0x000000FF;
-//							dstData[pixelIndex] |= (srcData2[pixelIndex] << 8) & 0x0000FF00;
-//							dstData[pixelIndex] |= (srcData3[pixelIndex] << 16) & 0x00FF0000;
-//						}
-//						
-//						everything.getRaster().setDataElements(0, rowIndex, size, 1, dstData);
-//					}
-					
-					int startPixel = actualThreadIndex * parallelHeight * size;
-					int endPixel = (actualThreadIndex + 1) * parallelHeight * size;
-										
-					for (int pixelIndex = startPixel; pixelIndex < endPixel; pixelIndex++)
-					{
-						dstData[pixelIndex] |= srcData1[pixelIndex] & 0x000000FF;
-						dstData[pixelIndex] |= (srcData2[pixelIndex] << 8) & 0x0000FF00;
-						dstData[pixelIndex] |= (srcData3[pixelIndex] << 16) & 0x00FF0000;
-					}
-					
-					synchronized (lock)
-					{						
-						numRunningThreads--;
-					}
-				}
-			}).start();
-		}
-		
-		while (numRunningThreads > 0)
-		{
-			try
-			{
-				Thread.sleep(1);
 			}
-			catch (InterruptedException e)
+			
+//			if (layerIndex == 0)
+//			{
+//				int blurRadius = 3;
+//				
+//				float[] matrix = new float[blurRadius * blurRadius];
+//				for (int i = 0; i < blurRadius * blurRadius; i++)
+//					matrix[i] = 1.0f/(blurRadius * blurRadius);
+//				
+//				Kernel kernel = new Kernel(blurRadius, blurRadius, matrix);
+//				BufferedImageOp op = new ConvolveOp(kernel);
+//				bufferedImage = op.filter(bufferedImage, null);
+//			}
+//			else if (layerIndex == 2)
+//			{
+//				int blurRadius = 5;
+//				
+//				float[] matrix = new float[blurRadius * blurRadius];
+//				for (int i = 0; i < blurRadius * blurRadius; i++)
+//					matrix[i] = 1.0f/(blurRadius * blurRadius);
+//				
+//				Kernel kernel = new Kernel(blurRadius, blurRadius, matrix);
+//				BufferedImageOp op = new ConvolveOp(kernel);
+//				bufferedImage = op.filter(bufferedImage, null);
+//			}
+				
+
+			byte[] src = ((DataBufferByte) bufferedImage.getData().getDataBuffer()).getData();
+
+			for (int pixelIndex = 0; pixelIndex < width * height; pixelIndex++)
 			{
+				if (shift < 0)
+					dstData[pixelIndex] |= (src[pixelIndex] >> -shift) & color;
+				else
+					dstData[pixelIndex] |= (src[pixelIndex] << shift) & color;
 			}
+
+			color <<= 5;
+			shift += 5;
+
+			Utils.log(String.format("Layer render time: %.2fs", (Timer.toc() * 0.001)));
+			
+			pbar.setValue(100 * (layerIndex + 1) / (layers.length + 1));
 		}
 
-		everything.getRaster().setDataElements(0, 0, size, size, dstData);
+		everything.getRaster().setDataElements(0, 0, width, height, dstData);
 		
-		Utils.log("Composite time: " + (Timer.toc() * 0.001));
+		
+		Utils.log(String.format("Bounds: x: %f, y: %f, X: %f, Y: %f", minX, minY, maxX, maxY));
+		bounds = new Rectangle2D.Double(minX, minY, maxX - minX, maxY - minY);
+		
+		
+		scale = 1.0;
+//		currentOffset.set((c.getWidth() - (maxX - minX)) * 0.5, ((maxY - minY) - c.getHeight()) * 0.5);
+		
+		
+		
+		
+		
+		Utils.log("Saving output image...");
 
-		
+		// Utils.log("Composite time: " + (Timer.toc() * 0.001));
+
 //		File outputfile = new File("layers.png");
 //		try
 //		{
@@ -387,6 +329,8 @@ public class Renderer
 //		{
 //			e.printStackTrace();
 //		}
+		
+		pbar.setValue(100);
 	}
 
 	public void finishedLoadingGerber()
@@ -439,27 +383,33 @@ public class Renderer
 
 			AffineTransform transform = graphics2D.getTransform();
 
-			graphics2D.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON); // Set anti-alias!
-			graphics2D.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON); // Set anti-alias for text
+			graphics2D.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+			graphics2D.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
 			// Draw background:
 			g.setColor(Color.BLACK);
 			g.fillRect(0, 0, getWidth(), getHeight());
 
-			if (!loadedGerber)
-				return;
+			if (loadedGerber)
+			{
+				graphics2D.translate(renderOffset.x, renderOffset.y);
+				graphics2D.scale(scale, scale);
+				// graphics2D.translate(0, -getHeight());
 
-			graphics2D.translate(renderOffset.x, renderOffset.y);
-			graphics2D.scale(scale, scale);
-//			graphics2D.translate(0, -getHeight());
-
-			graphics2D.drawImage(everything, 0, 0, null);
+				graphics2D.drawImage(everything, 0, 0, null);
+				
+//				graphics2D.setColor(Color.ORANGE);
+//				graphics2D.draw(bounds);
+			}
 
 			graphics2D.setTransform(transform);
+			
 			g.setFont(new Font("Consolas", Font.PLAIN, 20));
 			g.setColor(Color.WHITE);
 			graphics2D.drawString(String.format("X: %.0f", (mousePosition.x - currentOffset.x) / scale), 5, 20);
 			graphics2D.drawString(String.format("Y: %.0f", (mousePosition.y - currentOffset.y) / scale), 5, 40);
+			graphics2D.drawString(String.format("Mem total: %.0fMB", (Runtime.getRuntime().totalMemory()) * 1E-6), 5, 60);
+			graphics2D.drawString(String.format("Mem free: %.0fMB", (Runtime.getRuntime().freeMemory()) * 1E-6), 5, 80);
 		}
 	}
 }
