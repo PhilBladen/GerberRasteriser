@@ -2,20 +2,12 @@ package main;
 
 public class Config
 {
-	private static Config config = null;
-	
-	private Config()
-	{
-	}
-		
-	public static Config getConfig()
-	{
-		if (config == null)
-			config = new Config();
-		return config;
-	}
-
-	final public double rasterDPI = 2540;
-	final public double nanosToPixels = (rasterDPI / 25.4) * 1E-6;
-	final public boolean use16BitColor = true; // Improves memory usage but can significantly slow renderering in certain machines
+	public static final double rasterDPI = 2540;
+	public static final double nanosToPixels = (rasterDPI / 25.4) * 1E-6;
+	public static final boolean use16BitColor = false; // Reduced memory footprint but can significantly slow rendering on certain machines
+	public static final double maxZoom = 10;
+	public static final double minZoom = 0.05;
+	public static final boolean drawBoundingBoxes = false;
+	public static final boolean drawOuterBoundingBox = false;
+	public static final int exportBorderSize = 50;
 }

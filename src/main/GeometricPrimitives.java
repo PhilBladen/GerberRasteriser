@@ -8,6 +8,8 @@ import java.awt.geom.Path2D;
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
 
+import main.math.Vector2i;
+
 public class GeometricPrimitives
 {	
 	public static class Circle extends Area

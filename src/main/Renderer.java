@@ -1,5 +1,7 @@
 package main;
 
+import static main.Utils.log;
+
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
@@ -7,6 +9,8 @@ import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.MouseAdapter;
@@ -18,24 +22,35 @@ import java.awt.geom.AffineTransform;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
-import java.util.ArrayList;
+import java.io.File;
+import java.io.IOException;
 
+import javax.imageio.ImageIO;
+import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JProgressBar;
+import javax.swing.KeyStroke;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.border.EmptyBorder;
+import javax.swing.filechooser.FileNameExtensionFilter;
 
 import main.Utils.Timer;
+import main.graphicalobjects.Renderable;
+import main.math.Vector2d;
 
 public class Renderer
 {
 	private JFrame frame;
 	private GerberCanvas c;
 	private JProgressBar pbar;
-	JLabel label;
+	private JLabel label;
 
 	boolean dragging = false;
 	Vector2d dragStart = new Vector2d(0, 0);
@@ -49,17 +64,18 @@ public class Renderer
 
 	transient boolean loadedGerber = false;
 
-	private ArrayList<Layer> layers = new ArrayList<>();
+	private BufferedImage everything;
+	private Rectangle2D bounds;
 
 	private void updateRenderOffset()
 	{
 		renderOffset.set(currentOffset.add(dragOffset));
-		
-//		if (renderOffset.x < 0)
-//			renderOffset.x = 0;
-//
-//		if (renderOffset.y < 0)
-//			renderOffset.y = 0;
+
+		// if (renderOffset.x < 0)
+		// renderOffset.x = 0;
+		//
+		// if (renderOffset.y < 0)
+		// renderOffset.y = 0;
 
 		c.repaint();
 	}
@@ -75,7 +91,7 @@ public class Renderer
 		}
 
 		c = new GerberCanvas();
-		
+
 		JPanel bottom = new JPanel();
 		BorderLayout l;
 		bottom.setLayout(l = new BorderLayout());
@@ -84,15 +100,72 @@ public class Renderer
 		bottom.add(pbar = new JProgressBar(), BorderLayout.CENTER);
 		bottom.add(label = new JLabel("Loading gerbers..."), BorderLayout.EAST);
 
+		JMenuBar menuBar = new JMenuBar();
+		JMenu menu;
+
+		menu = new JMenu("File");
+		menu.setMnemonic(KeyEvent.VK_F);
+		menuBar.add(menu);
+
+		JMenuItem menuItem = new JMenuItem("Export PNG", KeyEvent.VK_E);
+		menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S, ActionEvent.CTRL_MASK));
+		menuItem.addActionListener(new ActionListener()
+		{
+			@Override
+			public void actionPerformed(ActionEvent e)
+			{
+				if (everything != null)
+				{
+					JFileChooser j = new JFileChooser();
+					j.setDialogType(JFileChooser.SAVE_DIALOG);
+					j.setSelectedFile(new File("Layers.png"));
+					j.setFileFilter(new FileNameExtensionFilter("PNG image (*.png)", "png"));
+					if (j.showSaveDialog(frame) != JFileChooser.APPROVE_OPTION)
+						return;
+
+					File selectedFile = j.getSelectedFile();
+					if (selectedFile == null)
+						return;
+
+					String fileName = selectedFile.getName();
+					if (fileName.lastIndexOf(".") != -1)
+						fileName = fileName.substring(0, fileName.lastIndexOf("."));
+
+					selectedFile = new File(selectedFile.getParentFile(), fileName + ".png");
+					if (selectedFile.exists())
+					{
+						int input = JOptionPane.showConfirmDialog(null, selectedFile.getName() + " already exists. Would you like to replace it?");
+						if (input != JOptionPane.YES_OPTION)
+							return;
+					}
+
+					label.setText("Saving output image...");
+					pbar.setValue(0);
+					Utils.log("Saving output image...");
+					try
+					{
+						ImageIO.write(everything, "png", selectedFile);
+					}
+					catch (IOException ex)
+					{
+						ex.printStackTrace();
+					}
+					pbar.setValue(100);
+					label.setText("Done.");
+				}
+			}
+		});
+		menu.add(menuItem);
+
 		frame = new JFrame("Gerber Rasteriser");
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frame.setLayout(new BorderLayout());
 		frame.add(c, BorderLayout.CENTER);
 		frame.add(bottom, BorderLayout.SOUTH);
+		frame.setJMenuBar(menuBar);
 		frame.pack();
 		frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
 		frame.setLocationRelativeTo(null);
-		frame.setVisible(true);
 
 		c.addMouseWheelListener(new MouseWheelListener()
 		{
@@ -112,11 +185,11 @@ public class Renderer
 					scaleMultiplier = 1.0 / scalePerClick;
 
 				scale *= scaleMultiplier;
-				
-				if (scale > 10)
-					scale = 10;
-				if (scale < 0.1)
-					scale = 0.1;
+
+				if (scale > Config.maxZoom)
+					scale = Config.maxZoom;
+				if (scale < Config.minZoom)
+					scale = Config.minZoom;
 
 				Vector2d newCanvasMousePos = canvasMousePos.multiply(scale);
 				mousePosition.subtract(newCanvasMousePos, currentOffset);
@@ -188,24 +261,17 @@ public class Renderer
 				}
 			}
 		});
+
+		frame.setVisible(true);
 	}
-
-	BufferedImage everything;
-	Rectangle2D bounds;
-
-	int numRunningThreads = 0;
-	Object lock = new Object();
 
 	public void addLayers(Layer... layers)
 	{
-		for (Layer l : layers)
-			this.layers.add(l);
-
 		int width = 10000;
 		int height = 10000;
 
 		pbar.setMaximum(100);
-		
+
 		double minX = Double.MAX_VALUE;
 		double minY = Double.MAX_VALUE;
 		double maxX = Double.MIN_VALUE;
@@ -213,7 +279,7 @@ public class Renderer
 		for (int layerIndex = 0; layerIndex < layers.length; layerIndex++)
 		{
 			Layer l = layers[layerIndex];
-			
+
 			Timer.tic();
 			Rectangle2D layerBounds = l.calculateBounds();
 			if (layerBounds.getMinX() < minX)
@@ -226,10 +292,12 @@ public class Renderer
 				maxY = layerBounds.getMaxY();
 			Utils.log(String.format("Bounds calc time: %.3fs", (Timer.toc() * 0.001)));
 		}
-		width = (int) (maxX - minX);
-		height = (int) (maxY - minY);
-		
-		if (Config.getConfig().use16BitColor)
+		width = (int) (maxX - minX) + Config.exportBorderSize * 2;
+		height = (int) (maxY - minY) + Config.exportBorderSize * 2;
+		// scale = 1.0;
+		// currentOffset.set((c.getWidth() - maxX) * 0.5, (maxY - c.getHeight()) * 0.5);
+
+		if (Config.use16BitColor)
 		{
 			everything = new BufferedImage(width, height, BufferedImage.TYPE_USHORT_555_RGB);
 			short[] dstData = new short[width * height];
@@ -251,11 +319,13 @@ public class Renderer
 				layerG2D.translate(0, height);
 				layerG2D.scale(1, -1);
 
+				layerG2D.translate(-minX - Config.exportBorderSize, -minY);
+
 				layerG2D.setColor(Color.WHITE);
 				for (Renderable r : l.objects)
 				{
 					r.render(layerG2D);
-				}					
+				}
 
 				byte[] src = ((DataBufferByte) bufferedImage.getData().getDataBuffer()).getData();
 
@@ -271,7 +341,7 @@ public class Renderer
 				shift += 5;
 
 				Utils.log(String.format("Layer render time: %.2fs", (Timer.toc() * 0.001)));
-				
+
 				pbar.setValue(100 * (layerIndex + 1) / (layers.length + 1));
 			}
 			everything.getRaster().setDataElements(0, 0, width, height, dstData);
@@ -298,11 +368,13 @@ public class Renderer
 				layerG2D.translate(0, height);
 				layerG2D.scale(1, -1);
 
+				layerG2D.translate(-minX + Config.exportBorderSize, -minY + Config.exportBorderSize);
+
 				layerG2D.setColor(Color.WHITE);
 				for (Renderable r : l.objects)
 				{
 					r.render(layerG2D);
-				}					
+				}
 
 				byte[] src = ((DataBufferByte) bufferedImage.getData().getDataBuffer()).getData();
 
@@ -313,98 +385,61 @@ public class Renderer
 				shift += 8;
 
 				Utils.log(String.format("Layer render time: %.2fs", (Timer.toc() * 0.001)));
-				
+
 				pbar.setValue(100 * (layerIndex + 1) / (layers.length + 1));
 			}
 			everything.getRaster().setDataElements(0, 0, width, height, dstData);
 		}
-			
-//			if (layerIndex == 0)
-//			{
-//				int blurRadius = 3;
-//				
-//				float[] matrix = new float[blurRadius * blurRadius];
-//				for (int i = 0; i < blurRadius * blurRadius; i++)
-//					matrix[i] = 1.0f/(blurRadius * blurRadius);
-//				
-//				Kernel kernel = new Kernel(blurRadius, blurRadius, matrix);
-//				BufferedImageOp op = new ConvolveOp(kernel);
-//				bufferedImage = op.filter(bufferedImage, null);
-//			}
-//			else if (layerIndex == 2)
-//			{
-//				int blurRadius = 5;
-//				
-//				float[] matrix = new float[blurRadius * blurRadius];
-//				for (int i = 0; i < blurRadius * blurRadius; i++)
-//					matrix[i] = 1.0f/(blurRadius * blurRadius);
-//				
-//				Kernel kernel = new Kernel(blurRadius, blurRadius, matrix);
-//				BufferedImageOp op = new ConvolveOp(kernel);
-//				bufferedImage = op.filter(bufferedImage, null);
-//			}
 
-		
-		
-		
+		// if (layerIndex == 0)
+		// {
+		// int blurRadius = 3;
+		//
+		// float[] matrix = new float[blurRadius * blurRadius];
+		// for (int i = 0; i < blurRadius * blurRadius; i++)
+		// matrix[i] = 1.0f/(blurRadius * blurRadius);
+		//
+		// Kernel kernel = new Kernel(blurRadius, blurRadius, matrix);
+		// BufferedImageOp op = new ConvolveOp(kernel);
+		// bufferedImage = op.filter(bufferedImage, null);
+		// }
+		// else if (layerIndex == 2)
+		// {
+		// int blurRadius = 5;
+		//
+		// float[] matrix = new float[blurRadius * blurRadius];
+		// for (int i = 0; i < blurRadius * blurRadius; i++)
+		// matrix[i] = 1.0f/(blurRadius * blurRadius);
+		//
+		// Kernel kernel = new Kernel(blurRadius, blurRadius, matrix);
+		// BufferedImageOp op = new ConvolveOp(kernel);
+		// bufferedImage = op.filter(bufferedImage, null);
+		// }
+
 		Utils.log(String.format("Bounds: x: %f, y: %f, X: %f, Y: %f", minX, minY, maxX, maxY));
 		bounds = new Rectangle2D.Double(minX, minY, maxX - minX, maxY - minY);
-		
-		
-		scale = 1.0;
-//		currentOffset.set((c.getWidth() - (maxX - minX)) * 0.5, ((maxY - minY) - c.getHeight()) * 0.5);
-		
-		
-		
-		
-		
-		Utils.log("Saving output image...");
+
+		scale = c.getHeight() / ((double) height + 200); // TODO consider width if wider than height
+		currentOffset.set((c.getWidth() - width * scale) * 0.5, (c.getHeight() - height * scale) * 0.5);
 
 		// Utils.log("Composite time: " + (Timer.toc() * 0.001));
 
-//		File outputfile = new File("layers.png");
-//		try
-//		{
-//			ImageIO.write(everything, "png", outputfile);
-//		}
-//		catch (IOException e)
-//		{
-//			e.printStackTrace();
-//		}
-		
 		pbar.setValue(100);
-	}
-
-	public void finishedLoadingGerber()
-	{
-		// maxX = 0;
-		// maxY = 0;
-		// for (Aperture a : apertures)
-		// {
-		// if (a.offset.x > maxX)
-		// maxX = a.offset.x;
-		// if (a.offset.y > maxY)
-		// maxY = a.offset.y;
-		//
-		//// a.area.getBounds2D(); // TODO
-		// }
-		// maxX = Utils.toPixels(maxX);
-		// maxY = Utils.toPixels(maxY);
-		//
-		// scale = 1.0;
-		// currentOffset.set((c.getWidth() - maxX) * 0.5, (maxY - c.getHeight()) * 0.5);
 
 		System.gc();
 
 		updateRenderOffset();
 
 		loadedGerber = true;
+
+		log("All layers loaded.");
+		label.setText("All layers loaded.");
 	}
 
 	public class GerberCanvas extends JPanel
 	{
 		private static final long serialVersionUID = 1L;
-		
+
 		private Runtime runtime = Runtime.getRuntime();
 
 		public GerberCanvas()
@@ -441,13 +476,22 @@ public class Renderer
 				// graphics2D.translate(0, -getHeight());
 
 				graphics2D.drawImage(everything, 0, 0, null);
-				
-//				graphics2D.setColor(Color.ORANGE);
-//				graphics2D.draw(bounds);
+
+				if (Config.drawOuterBoundingBox)
+				{
+					graphics2D.setColor(Color.ORANGE);
+					graphics2D.draw(new Rectangle2D.Double(0, 0, bounds.getWidth(), bounds.getHeight()));
+				}
+
+				// graphics2D.setColor(Color.WHITE);
+				// graphics2D.setStroke(new BasicStroke(1));
+				// graphics2D.drawLine(-10, 0, 10, 0);
+				// graphics2D.drawLine(0, -10, 0, 10);
+
 			}
 
 			graphics2D.setTransform(transform);
-			
+
 			g.setFont(new Font("Consolas", Font.PLAIN, 20));
 			g.setColor(Color.WHITE);
 			graphics2D.drawString(String.format("X: %.0f", (mousePosition.x - currentOffset.x) / scale), 5, 20);

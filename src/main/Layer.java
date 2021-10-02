@@ -4,11 +4,6 @@ import static main.Utils.err;
 import static main.Utils.log;
 import static main.Utils.warn;
 
-import java.awt.AlphaComposite;
-import java.awt.BasicStroke;
-import java.awt.Color;
-import java.awt.Composite;
-import java.awt.Graphics2D;
 import java.awt.Shape;
 import java.awt.geom.Arc2D;
 import java.awt.geom.Area;
@@ -24,10 +19,16 @@ import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import main.Aperture.Custom;
 import main.Layer.Modifiers.Mirroring;
 import main.Layer.Modifiers.Polarity;
 import main.Utils.Timer;
+import main.graphicalobjects.Aperture;
+import main.graphicalobjects.Aperture.Custom;
+import main.graphicalobjects.Interpolation;
+import main.graphicalobjects.Region;
+import main.graphicalobjects.Renderable;
+import main.math.Matrix2D;
+import main.math.Vector2i;
 
 public class Layer
 {
@@ -51,6 +52,7 @@ public class Layer
 	private Modifiers globalModifiers = new Modifiers();
 	private UnitType units = UnitType.NONE;
 	private int gerberUnitsToNanosMultiplier;
+	private boolean reachedEndOfGerber = false;
 
 	public ArrayList<Renderable> objects = new ArrayList<>();
 	
@@ -91,16 +93,18 @@ public class Layer
 
 		Timer.tic();
 		for (Command command : commands)
-			processCommand(command);
+			processCommand(command);		
+		if (!reachedEndOfGerber)
+			throw new RuntimeException("No end of file found. Is this a valid Gerber file?");
 		log("Processed " + file.getName() + " in " + String.format("%.2fs.", Timer.toc() * 0.001) + "\n");
 	}
 
 	public static class Modifiers
 	{
-		Polarity polarity = Polarity.DARK;
-		Mirroring mirroring = Mirroring.NONE;
-		double rotation = 0.0;
-		double scaling = 0.0;
+		public Polarity polarity = Polarity.DARK;
+		public Mirroring mirroring = Mirroring.NONE;
+		public double rotation = 0.0;
+		public double scaling = 0.0;
 
 		// FIXME add mirroring, rotation and scaling functionality
 
@@ -134,86 +138,6 @@ public class Layer
 			newModifiers.rotation = rotation;
 			newModifiers.scaling = scaling;
 			return newModifiers;
-		}
-	}
-
-	public class Interpolation implements Renderable
-	{
-		private Modifiers modifiers;
-		private Shape s;
-		private int thickness;
-
-		public Interpolation(Modifiers m)
-		{
-			this.modifiers = m;
-		}
-
-		@Override
-		public void render(Graphics2D g)
-		{
-			Composite c = g.getComposite();
-			
-			if (modifiers.polarity == Polarity.DARK)
-				g.setColor(Color.WHITE);
-			else
-				g.setComposite(AlphaComposite.Clear);
-
-			g.setStroke(new BasicStroke((float) Utils.toPixels(thickness), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-			g.draw(s);
-			
-			g.setComposite(c); // Restore
-		}
-
-		@Override
-		public void setModifiers(Modifiers m)
-		{
-			modifiers = m;
-		}
-
-		@Override
-		public Rectangle2D getBounds()
-		{
-			return s.getBounds2D();
-		}
-	}
-
-	public class Region implements Renderable
-	{
-		private Modifiers modifiers;
-		private Path2D p;
-
-		public Region(Path2D p, Modifiers modifiers)
-		{
-			this.p = p;
-			this.modifiers = modifiers;
-		}
-
-		@Override
-		public void render(Graphics2D g)
-		{
-			Composite c = g.getComposite();
-			
-			if (modifiers.polarity == Polarity.DARK)
-				g.setColor(Color.WHITE);
-			else
-				g.setComposite(AlphaComposite.Clear);
-
-			// g.setStroke(new BasicStroke((float) 1, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-			g.fill(p);
-			
-			g.setComposite(c); // Restore
-		}
-
-		@Override
-		public void setModifiers(Modifiers m)
-		{
-			modifiers = m;
-		}
-
-		@Override
-		public Rectangle2D getBounds()
-		{
-			return p.getBounds2D();
 		}
 	}
 
@@ -281,23 +205,46 @@ public class Layer
 		units = UnitType.IN;
 	}
 	
+	Renderable minXObj, minYObj, maxXObj, maxYObj;
+	
 	public Rectangle2D calculateBounds() // TODO include line stroke width
 	{
 		double minX = Double.MAX_VALUE;
 		double minY = Double.MAX_VALUE;
 		double maxX = Double.MIN_VALUE;
 		double maxY = Double.MIN_VALUE;
+		
+
+		
 		for (Renderable r : objects)
 		{
+//			if (!(r instanceof Aperture))
+//				continue; // FIXME remove this please
+			
+			if (r.getModifiers().polarity == Polarity.CLEAR)
+				continue;
+			
 			Rectangle2D localBounds = r.getBounds();
 			if (localBounds.getMinX() < minX)
+			{
 				minX = localBounds.getMinX();
+				minXObj = r;
+			}
 			if (localBounds.getMinY() < minY)
+			{
 				minY = localBounds.getMinY();
+				minYObj = r;
+			}
 			if (localBounds.getMaxX() > maxX)
+			{
 				maxX = localBounds.getMaxX();
+				maxXObj = r;
+			}
 			if (localBounds.getMaxY() > maxY)
+			{
 				maxY = localBounds.getMaxY();
+				maxYObj = r;
+			}
 		}
 		Utils.log(String.format("Bounds: x: %f, y: %f, X: %f, Y: %f", minX, minY, maxX, maxY));
 		return new Rectangle2D.Double(minX, minY, maxX - minX, maxY - minY);
@@ -472,9 +419,17 @@ public class Layer
 	{
 		return coordinatePattern.matcher(word).matches();
 	}
+	
+	private void endOfGerber()
+	{
+		reachedEndOfGerber = true;
+	}
 
 	private void processCommand(Command command)
 	{
+		if (reachedEndOfGerber)
+			throw new RuntimeException("Commands found after end of Gerber.");
+		
 		String commandWord = command.words.get(0);
 		if (commandWord.startsWith("G04")) // Comment
 		{
@@ -685,11 +640,7 @@ public class Layer
 							Integer strokeWidth = ((Aperture.Circle) selectedAperture).diameter;
 
 							Line2D l = new Line2D.Double(Utils.toPixels(currentPoint.x), Utils.toPixels(currentPoint.y), Utils.toPixels(currentPoint.x), Utils.toPixels(currentPoint.y));
-
-							Interpolation t = new Interpolation(globalModifiers.clone());
-							t.s = l;
-							t.thickness = strokeWidth;
-							objects.add(t);
+							objects.add(new Interpolation(globalModifiers.clone(), strokeWidth, l));
 
 							break;
 						case 2: // Move
@@ -910,10 +861,7 @@ public class Layer
 						}
 						else
 						{
-							Interpolation t = new Interpolation(globalModifiers.clone());
-							t.s = l;
-							t.thickness = strokeWidth;
-							objects.add(t);
+							objects.add(new Interpolation(globalModifiers.clone(), strokeWidth, l));
 						}
 
 					}
@@ -947,10 +895,7 @@ public class Layer
 						}
 						else
 						{
-							Interpolation t = new Interpolation(globalModifiers.clone());
-							t.s = l;
-							t.thickness = strokeWidth;
-							objects.add(t);
+							objects.add(new Interpolation(globalModifiers.clone(), strokeWidth, l));
 						}
 					}
 					else if (interpolationMode == InterpolationMode.CIRC_CCW)
@@ -983,10 +928,7 @@ public class Layer
 						}
 						else
 						{
-							Interpolation t = new Interpolation(globalModifiers.clone());
-							t.s = l;
-							t.thickness = strokeWidth;
-							objects.add(t);
+							objects.add(new Interpolation(globalModifiers.clone(), strokeWidth, l));
 						}
 
 					}
@@ -1025,7 +967,7 @@ public class Layer
 		}
 		else if (commandWord.startsWith("M02"))
 		{
-			log("Reached end of file :)"); // TODO check nothing comes after
+			endOfGerber();
 		}
 		// Deprecated commands:
 		else if (commandWord.startsWith("G54")) // Select aperture
@@ -1054,7 +996,7 @@ public class Layer
 		}
 		else if (commandWord.startsWith("M00")) // Program stop
 		{
-			// TODO duplicate M02 functionality
+			endOfGerber();
 		}
 		else if (commandWord.startsWith("M01")) // Optional stop
 		{

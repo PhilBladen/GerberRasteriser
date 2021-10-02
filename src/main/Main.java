@@ -22,6 +22,7 @@ public class Main
 		Layer silk = new Layer(new File("Reference files/STAR-XL CCT.GTO"));
 		Layer solderResist = new Layer(new File("Reference files/STAR-XL CCT.GTS"));
 		renderer.addLayers(copper, solderResist, silk);
+//		renderer.addLayers(copper, copper, copper);
 		
 //		Layer copper = new Layer(new File("Reference files/STAR-XL CCT.GBL"));
 //		Layer silk = new Layer(new File("Reference files/STAR-XL CCT.GBO"));
@@ -38,10 +39,6 @@ public class Main
 
 		
 		//		Layer copper2 = new Layer(new File("E:/PJB/Programming/Java/Workspace/GerberRasteriser/Reference files/GerberTest/GerberFiles/copper_top.gbr"));
-		
-		renderer.finishedLoadingGerber();
-
-		log("All layers loaded.");
 	}
 	
 	public static void main(String[] args)

@@ -25,7 +25,7 @@ public class Utils
 	
 	public static double toPixels(double d)
 	{
-		return Config.getConfig().nanosToPixels * d;
+		return Config.nanosToPixels * d;
 	}
 	
 	public static double toRads(double deg)
