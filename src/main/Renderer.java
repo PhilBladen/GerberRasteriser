@@ -231,7 +231,7 @@ public class Renderer
 		height = (int) (maxY - minY);
 		
 		everything = new BufferedImage(width, height, BufferedImage.TYPE_USHORT_555_RGB);
-		short[] dstData = ((DataBufferUShort) everything.getData().getDataBuffer()).getData();
+		short[] dstData = new short[width * height];
 
 		short color = 0x1F;
 		short shift = -3;
@@ -362,6 +362,8 @@ public class Renderer
 	public class GerberCanvas extends JPanel
 	{
 		private static final long serialVersionUID = 1L;
+		
+		private Runtime runtime = Runtime.getRuntime();
 
 		public GerberCanvas()
 		{
@@ -408,8 +410,8 @@ public class Renderer
 			g.setColor(Color.WHITE);
 			graphics2D.drawString(String.format("X: %.0f", (mousePosition.x - currentOffset.x) / scale), 5, 20);
 			graphics2D.drawString(String.format("Y: %.0f", (mousePosition.y - currentOffset.y) / scale), 5, 40);
-			graphics2D.drawString(String.format("Mem total: %.0fMB", (Runtime.getRuntime().totalMemory()) * 1E-6), 5, 60);
-			graphics2D.drawString(String.format("Mem free: %.0fMB", (Runtime.getRuntime().freeMemory()) * 1E-6), 5, 80);
+			graphics2D.drawString(String.format("Mem total: %.0fMB", (runtime.totalMemory()) * 1E-6), 5, 60);
+			graphics2D.drawString(String.format("Mem free: %.0fMB", (runtime.freeMemory()) * 1E-6), 5, 80);
 		}
 	}
 }
