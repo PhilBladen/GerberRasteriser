@@ -27,14 +27,25 @@ public class Region implements Renderable
 	public void render(Graphics2D g)
 	{
 		Composite c = g.getComposite();
-		
-		if (modifiers.polarity == Polarity.DARK)
-			g.setColor(Color.WHITE);
-		else
-			g.setComposite(AlphaComposite.Clear);
 
-		// g.setStroke(new BasicStroke((float) 1, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-		g.fill(p);
+		if (Config.renderRegionAsOutline)
+		{
+			g.setColor(Color.WHITE);
+			if (modifiers.polarity == Polarity.DARK)
+				g.setStroke(new BasicStroke((float) 1, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+			else			
+				g.setStroke(new BasicStroke((float) 1, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 0, new float[]{9}, 0));
+			g.draw(p);
+		}
+		else
+		{
+			if (modifiers.polarity == Polarity.DARK)
+				g.setColor(Color.WHITE);
+			else
+				g.setComposite(AlphaComposite.Clear);
+			
+			g.fill(p);
+		}
 		
 		g.setComposite(c); // Restore
 		

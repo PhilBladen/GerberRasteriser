@@ -99,7 +99,8 @@ public class Aperture implements Renderable
 			this.diameter = diameter;
 			
 			area.add(new GeometricPrimitives.Circle(diameter, GeometricPrimitives.origin, 0));
-			area.subtract(new GeometricPrimitives.Circle(holeDiameter, GeometricPrimitives.origin, 0));
+			if (holeDiameter > 0)
+				area.subtract(new GeometricPrimitives.Circle(holeDiameter, GeometricPrimitives.origin, 0));
 		}
 	}
 	
@@ -115,7 +116,8 @@ public class Aperture implements Renderable
 			super(m);
 			
 			area.add(new GeometricPrimitives.Rectangle(x, y, GeometricPrimitives.origin, 0));
-			area.subtract(new GeometricPrimitives.Circle(holeDiameter, GeometricPrimitives.origin, 0));
+			if (holeDiameter > 0)
+				area.subtract(new GeometricPrimitives.Circle(holeDiameter, GeometricPrimitives.origin, 0));
 		}
 	}
 	
@@ -150,7 +152,8 @@ public class Aperture implements Renderable
 				area.add(new GeometricPrimitives.Circle(x, new Vector2i(0, d / 2), 0));
 				area.add(new GeometricPrimitives.Rectangle(x, d, GeometricPrimitives.origin, 0));
 			}
-			area.subtract(new GeometricPrimitives.Circle(holeDiameter, GeometricPrimitives.origin, 0));
+			if (holeDiameter > 0)
+				area.subtract(new GeometricPrimitives.Circle(holeDiameter, GeometricPrimitives.origin, 0));
 		}
 	}
 	
@@ -171,7 +174,8 @@ public class Aperture implements Renderable
 			super(m);
 			
 			area.add(new GeometricPrimitives.Polygon(numVertices, outerDiameter, GeometricPrimitives.origin, rotation));
-			area.subtract(new GeometricPrimitives.Circle(holeDiameter, GeometricPrimitives.origin, 0));
+			if (holeDiameter > 0)
+				area.subtract(new GeometricPrimitives.Circle(holeDiameter, GeometricPrimitives.origin, 0));
 		}
 	}
 	

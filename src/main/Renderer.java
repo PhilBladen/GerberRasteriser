@@ -2,6 +2,7 @@ package main;
 
 import static main.Utils.log;
 
+import java.awt.BasicStroke;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
@@ -19,6 +20,7 @@ import java.awt.event.MouseMotionAdapter;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
 import java.awt.geom.AffineTransform;
+import java.awt.geom.Line2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
@@ -66,6 +68,13 @@ public class Renderer
 
 	private BufferedImage everything;
 	private Rectangle2D bounds;
+	
+	private Unit units = Unit.MM;
+	
+	private enum Unit
+	{
+		MM, MIL
+	}
 
 	private void updateRenderOffset()
 	{
@@ -153,6 +162,23 @@ public class Renderer
 					pbar.setValue(100);
 					label.setText("Done.");
 				}
+			}
+		});
+		menu.add(menuItem);
+		
+		menuItem = new JMenuItem("Toggle units (mm/mil)", KeyEvent.VK_T);
+		menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_Q, 0));
+		menuItem.addActionListener(new ActionListener()
+		{
+			@Override
+			public void actionPerformed(ActionEvent e)
+			{
+				if (units == Unit.MM)
+					units = Unit.MIL;
+				else
+					units = Unit.MM;
+				
+				c.repaint();
 			}
 		});
 		menu.add(menuItem);
@@ -276,6 +302,8 @@ public class Renderer
 		for (int layerIndex = 0; layerIndex < layers.length; layerIndex++)
 		{
 			Layer l = layers[layerIndex];
+			if (l == null)
+				continue;
 
 			Timer.tic();
 			Rectangle2D layerBounds = l.calculateBounds();
@@ -312,6 +340,8 @@ public class Renderer
 		for (int layerIndex = 0; layerIndex < layers.length; layerIndex++)
 		{
 			Layer l = layers[layerIndex];
+			if (l == null)
+				continue;
 
 			Timer.tic();
 
@@ -332,10 +362,10 @@ public class Renderer
 			
 			Utils.log(String.format("Layer render time: %.2fs", (Timer.toc() * 0.001)));
 			
-			 if (layerIndex == 0)
-				 bufferedImage = Utils.blur(bufferedImage, 1);
-			 else if (layerIndex == 2)
-				 bufferedImage = Utils.blur(bufferedImage, 1);
+//			 if (layerIndex == 0)
+//				 bufferedImage = Utils.blur(bufferedImage, 1);
+//			 else if (layerIndex == 2)
+//				 bufferedImage = Utils.blur(bufferedImage, 1);
 
 			// Composite onto existing image:
 			Timer.tic();
@@ -418,7 +448,9 @@ public class Renderer
 			g.setColor(Color.BLACK);
 			g.fillRect(0, 0, getWidth(), getHeight());
 
-			if (loadedGerber)
+			if (!loadedGerber)
+				return;
+			
 			{
 				graphics2D.translate(renderOffset.x, renderOffset.y);
 				graphics2D.scale(scale, scale);
@@ -432,21 +464,46 @@ public class Renderer
 					graphics2D.draw(new Rectangle2D.Double(Config.exportBorderSize, Config.exportBorderSize, bounds.getWidth(), bounds.getHeight()));
 				}
 
-				// graphics2D.setColor(Color.WHITE);
-				// graphics2D.setStroke(new BasicStroke(1));
-				// graphics2D.drawLine(-10, 0, 10, 0);
-				// graphics2D.drawLine(0, -10, 0, 10);
+	
 
 			}
+			
+			graphics2D.setTransform(transform);
+			
+			Vector2d gerberOrigin_canvasPixels = new Vector2d(-bounds.getX() + Config.exportBorderSize, (bounds.getHeight() + bounds.getY()) + Config.exportBorderSize);
+			graphics2D.translate(renderOffset.x + gerberOrigin_canvasPixels.x * scale, renderOffset.y + gerberOrigin_canvasPixels.y * scale);
+			graphics2D.setColor(Color.ORANGE);
+			graphics2D.setStroke(new BasicStroke(3));
+			graphics2D.draw(new Line2D.Double(-10, 0, 10, 0));
+			graphics2D.draw(new Line2D.Double(0, -10, 0, 10));
+//			graphics2D.drawLine(0, -10, 0, 10);
 
 			graphics2D.setTransform(transform);
 
 			g.setFont(new Font("Consolas", Font.PLAIN, 20));
 			g.setColor(Color.WHITE);
-			graphics2D.drawString(String.format("X: %.0f", (mousePosition.x - currentOffset.x) / scale), 5, 20);
-			graphics2D.drawString(String.format("Y: %.0f", (mousePosition.y - currentOffset.y) / scale), 5, 40);
-			graphics2D.drawString(String.format("Mem total: %.0fMB", (runtime.totalMemory()) * 1E-6), 5, 60);
-			graphics2D.drawString(String.format("Mem free: %.0fMB", (runtime.freeMemory()) * 1E-6), 5, 80);
+			
+			double mouseX_canvasPixels = (mousePosition.x - currentOffset.x) / scale;
+			double mouseY_canvasPixels = (mousePosition.y - currentOffset.y) / scale;
+			
+			double mouseX_gerberPixels = mouseX_canvasPixels - Config.exportBorderSize;
+			double mouseY_gerberPixels = (bounds.getHeight() - mouseY_canvasPixels) + Config.exportBorderSize;
+			
+			double mouseXFromGerberOrigin_gerberPixels = mouseX_gerberPixels + bounds.getX();
+			double mouseYFromGerberOrigin_gerberPixels = mouseY_gerberPixels + bounds.getY();
+			
+			if (units == Unit.MM)
+			{
+				graphics2D.drawString(String.format("X: %.2fmm", (mouseXFromGerberOrigin_gerberPixels / Config.nanosToPixels) * 1E-6), 5, 20);
+				graphics2D.drawString(String.format("Y: %.2fmm", (mouseYFromGerberOrigin_gerberPixels / Config.nanosToPixels) * 1E-6), 5, 40);
+			}
+			else
+			{
+				graphics2D.drawString(String.format("X: %.0fmil", (mouseXFromGerberOrigin_gerberPixels / Config.rasterDPI) * 1E3), 5, 20);
+				graphics2D.drawString(String.format("Y: %.0fmil", (mouseYFromGerberOrigin_gerberPixels / Config.rasterDPI) * 1E3), 5, 40);
+			}
+			graphics2D.drawString(String.format("RAM usage: %.0fMB (reserved: %.0fMB)", (runtime.totalMemory() - runtime.freeMemory()) * 1E-6, runtime.totalMemory() * 1E-6), 5, 60);
+//			graphics2D.drawString(String.format("Mem free: %.0fMB", (runtime.freeMemory()) * 1E-6), 5, 80);
 		}
 	}
 }

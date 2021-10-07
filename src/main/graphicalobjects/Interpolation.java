@@ -36,7 +36,7 @@ public class Interpolation implements Renderable
 		else
 			g.setComposite(AlphaComposite.Clear);
 
-		g.setStroke(new BasicStroke((float) Utils.toPixels(thickness), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+		g.setStroke(new BasicStroke((float) Math.ceil(Utils.toPixels(thickness)), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
 		g.draw(s);
 		
 		g.setComposite(c); // Restore
