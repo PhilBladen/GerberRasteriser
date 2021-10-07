@@ -13,18 +13,16 @@ public class Main
 
 	private Renderer renderer;
 	
-	private File previousPath = null;
-	
-	private Layer loadLayer()
+	private Layer loadLayer(String chooserTitle)
 	{
 		JFileChooser j = new JFileChooser();
 		j.setDialogType(JFileChooser.OPEN_DIALOG);
-		j.setDialogTitle("Open copper (blue) gerber file");
-		j.setCurrentDirectory(previousPath);
+		j.setDialogTitle(chooserTitle);
+		j.setCurrentDirectory(new File(Config.defaultOpenPath));
 		if (j.showOpenDialog(null) != JFileChooser.APPROVE_OPTION)
 			return null;
 		
-		previousPath=  j.getSelectedFile().getParentFile();
+		Config.setDefaultPath(j.getSelectedFile().getParent());
 		
 		File file = j.getSelectedFile();
 		if (file != null && file.exists())
@@ -39,13 +37,15 @@ public class Main
 	public Main()
 	{
 		log("Running " + APP_NAME + " " + APP_VERSION);
+		
+		Config.load();
 
 		renderer = new Renderer();
 		renderer.createWindow();
 		
-		Layer copper = loadLayer();
-		Layer solderResist = loadLayer();
-		Layer silk = loadLayer();
+		Layer copper = loadLayer("Open copper (blue) gerber file");
+		Layer solderResist = loadLayer("Open solder resist (green) gerber file");
+		Layer silk = loadLayer("Open silk (red) gerber file");
 		renderer.addLayers(copper, solderResist, silk);
 	}
 	

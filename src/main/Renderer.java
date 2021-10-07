@@ -330,12 +330,15 @@ public class Renderer
 			for (Renderable r : l.objects)
 				r.render(layerG2D);
 			
-//			 if (layerIndex == 0)
-//				 bufferedImage = Utils.blur(bufferedImage, 3);
-//			 else if (layerIndex == 2)
-//				 bufferedImage = Utils.blur(bufferedImage, 5);
+			Utils.log(String.format("Layer render time: %.2fs", (Timer.toc() * 0.001)));
+			
+			 if (layerIndex == 0)
+				 bufferedImage = Utils.blur(bufferedImage, 1);
+			 else if (layerIndex == 2)
+				 bufferedImage = Utils.blur(bufferedImage, 1);
 
 			// Composite onto existing image:
+			Timer.tic();
 			byte[] src = ((DataBufferByte) bufferedImage.getData().getDataBuffer()).getData();
 			if (Config.use16BitColor)
 			{
@@ -356,8 +359,8 @@ public class Renderer
 				color <<= 8;
 				shift += 8;
 			}
+			Utils.log(String.format("Layer composite time: %.2fs", (Timer.toc() * 0.001)));
 
-			Utils.log(String.format("Layer render time: %.2fs", (Timer.toc() * 0.001)));
 			pbar.setValue(100 * (layerIndex + 1) / (layers.length + 1));
 		}
 		everything.getRaster().setDataElements(0, 0, width, height, dstData);
@@ -365,10 +368,9 @@ public class Renderer
 		Utils.log(String.format("Bounds: x: %f, y: %f, X: %f, Y: %f", minX, minY, maxX, maxY));
 		bounds = new Rectangle2D.Double(minX, minY, maxX - minX, maxY - minY);
 
-		if (height < width)
-			scale = c.getHeight() / ((double) height + 200);
-		else
-			scale = c.getWidth() / ((double) width + 200);
+		double scaleRequiredToFitHeight = c.getHeight() / ((double) height + 200);
+		double scaleRequiredToFitWidth = c.getWidth() / ((double) width + 200);
+		scale = Math.min(scaleRequiredToFitHeight, scaleRequiredToFitWidth);
 		currentOffset.set((c.getWidth() - width * scale) * 0.5, (c.getHeight() - height * scale) * 0.5);
 
 		pbar.setValue(100);
@@ -427,7 +429,7 @@ public class Renderer
 				if (Config.drawOuterBoundingBox)
 				{
 					graphics2D.setColor(Color.ORANGE);
-					graphics2D.draw(new Rectangle2D.Double(0, 0, bounds.getWidth(), bounds.getHeight()));
+					graphics2D.draw(new Rectangle2D.Double(Config.exportBorderSize, Config.exportBorderSize, bounds.getWidth(), bounds.getHeight()));
 				}
 
 				// graphics2D.setColor(Color.WHITE);
